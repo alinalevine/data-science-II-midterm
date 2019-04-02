@@ -1,0 +1,51 @@
+---
+title: "data_science_load_data"
+author: "Alina Levine"
+date: "April 2, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library(Hmisc)
+library(SASxport)
+data(Alfalfa)
+library(tidyverse)
+
+
+
+```
+
+#Demographics variables
+
+sequence number, hispanic ethnicity, age,Ttotal household income
+
+https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Demographics&CycleBeginYear=2015
+
+```{r}
+
+
+lookup.xport("data/demographics.XPT")
+
+demographics = read.xport("data/demographics.xpt") %>%
+  select(SEQN, RIDRETH1, RIAGENDR,INDHHIN2)
+
+```
+
+
+#blood pressure and cholesterol
+ever told you have high blood pressure, doctor ever told you have high cholesterol
+
+https://wwwn.cdc.gov/Nchs/Nhanes/2015-2016/BPQ_I.htm
+
+```{r}
+
+lookup.xport("data/BPQ_I.xpt")
+
+bp_chol = read.xport("data/BPQ_I.xpt") %>%
+  select(SEQN, BPQ020, BPQ080)
+
+```
+
+
+#
