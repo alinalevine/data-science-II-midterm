@@ -6,17 +6,9 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-library(Hmisc)
-<<<<<<< HEAD
-library(xSASxport)
-data(Alfalfa)
 library(tidyverse)
-=======
-data(Alfalfa)
 library(tidyverse)
 library(haven)
-
->>>>>>> 6f53fe0f592fd85874a906d98f372603be9d78cb
 
 ```
 
@@ -27,17 +19,7 @@ sequence number, hispanic ethnicity, age,Ttotal household income
 https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Demographics&CycleBeginYear=2015
 
 ```{r}
-<<<<<<< HEAD
-library(SASxport)
-lookup.xport("data/demographics.XPT")
-
-demographics = read.xport("data/demographics.xpt") %>%
-  select(SEQN, RIDRETH1, RIAGENDR,INDHHIN2)
-=======
-
-
 demographics = read_xpt("data/demographics.XPT") %>% janitor::clean_names()
->>>>>>> 6f53fe0f592fd85874a906d98f372603be9d78cb
 
 ```
 
@@ -57,13 +39,83 @@ bp_chol = read.xport("data/BPQ_I.xpt") %>%
 ```
 
 
-#
+# Body Measure
 
 ```{r}
 lookup.xport("data/body_measures.xpt")
 
-body_measures = read.xport("data/body_measures.xpt") %>%
-  select(SEQN, BMXBMN)
+body_measures = 
+  read_xpt("data/body_measures.xpt") %>% 
+  select(SEQN, 
+         bmi = BMXBMI)
 
+# proportion of missing value
+sum(is.na(body_measures$bmi))/length(body_measures$SEQN)
+                                    
+```
+
+
+
+# Diet Behavior and Nutrition
+
+```{r}
+lookup.xport("data/diet.xpt")
+
+diet_behavior =
+  read_xpt("data/diet.xpt") %>% 
+  select(SEQN, 
+         fast = DBD900, 
+         ready = DBD905, 
+         forzen = DBD910) 
+
+# proportion of missing value
+sum(is.na(diet_behavior$fast))/length(diet_behavior$SEQN)
+sum(is.na(diet_behavior$ready))/length(diet_behavior$SEQN)
+sum(is.na(diet_behavior$forzen))/length(diet_behavior$SEQN)
+```
+
+
+# Diabetes
+
+```{r}
+lookup.xport("data/diabetes.xpt")
+
+diabetes =
+  read_xpt("data/diabetes.xpt") %>% 
+  select(SEQN, 
+         diabete = DIQ010)
+
+# proportion of missing value
+sum(is.na(diabetes$diabete))/length(diabetes$SEQN)
+```
+
+# Medical Conditions
+
+```{r}
+lookup.xport("data/medical_cond.xpt")
+
+medical_cond =
+  read_xpt("data/medical_cond.xpt") %>% 
+  select(SEQN, 
+         overweight = MCQ080, 
+         gout = MCQ160N) 
+
+
+# proportion of missing value
+sum(is.na(medical_cond$overweight))/length(medical_cond$SEQN)
+sum(is.na(medical_cond$gout))/length(medical_cond$SEQN)
+```
+
+
+# Response
+
+```{r}
+coronary = 
+  read_xpt("data/medical_cond.xpt") %>% 
+  select(SEQN, 
+         disease = MCQ160C) 
+
+# proportion of missing value
+sum(is.na(coronary$disease))/length(coronary$SEQN)
 ```
 
