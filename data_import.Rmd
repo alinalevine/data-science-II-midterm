@@ -64,13 +64,13 @@ depression = read_xpt("data/mental_health.XPT") %>%
   janitor::clean_names()
 
 seqn = depression$seqn
+
 depression_subset = depression %>% select(-seqn)
 
 depression = map_dfc(depression_subset, ~ifelse(.x %in% c(0,1,2,3), .x, NA)) %>% 
   mutate(depression_score = round(rowMeans(., na.rm = TRUE), 3)) %>% 
   add_column(seqn) %>% 
   select(seqn, depression_score)
-
   
 ```
 
