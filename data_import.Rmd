@@ -6,13 +6,10 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-
 library(Hmisc)
-library(SASxport)
+library(xSASxport)
 data(Alfalfa)
 library(tidyverse)
-
-
 
 ```
 
@@ -23,8 +20,7 @@ sequence number, hispanic ethnicity, age,Ttotal household income
 https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Demographics&CycleBeginYear=2015
 
 ```{r}
-
-
+library(SASxport)
 lookup.xport("data/demographics.XPT")
 
 demographics = read.xport("data/demographics.xpt") %>%
