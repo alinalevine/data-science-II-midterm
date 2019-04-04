@@ -8,26 +8,71 @@ output: html_document
 ```{r setup, include=FALSE}
 
 library(Hmisc)
-data(Alfalfa)
 library(tidyverse)
 library(haven)
 
 
 ```
 
-#Demographics variables
+Here, we will import the separate datasets and combine for further analysis.
 
-sequence number, hispanic ethnicity, age,Ttotal household income
+Our targets are participants who are 20 years older.
+
+# Demographics variables
+
+
+Age in years at screening: variable name RIDAGEYR
+Gender: variable name RIAGENDR
+Marital status: variable name DMDMARTL
+Race/ethinicity: Race/Hispanic origin w/ NH Asian, variable name RIDRETH3
+Citizenship status: variable name DMDCITZN
+Education level: Education level - Adults 20+, variable name DMDEDUC2
+
+
 
 https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Demographics&CycleBeginYear=2015
 
-```{r}
+```{r demo}
+demographics = read_xpt("data/demographics.XPT") %>% 
+  janitor::clean_names() %>%
+  select(seqn, ridageyr, riagendr, dmdmartl, ridreth3, dmdcitzn, dmdeduc2) %>% 
+  filter(ridageyr > 20)
+```
 
+# Income
 
-demographics = read_xpt("data/demographics.XPT") %>% janitor::clean_names()
+Family monthly poverty level category, variable name: INDFMMPCSAS
+https://wwwn.cdc.gov/Nchs/Nhanes/2015-2016/INQ_I.htm#INDFMMPI 
+
+1	Monthly poverty level index <= 1.30;2	1.30 < Monthly poverty level index <= 1.85;3	Monthly poverty level index > 1.85
+```{r income}
+
+income = read_xpt("data/income.XPT") %>% 
+  janitor::clean_names() %>% 
+  select(seqn, income = indfmmpc) %>% 
+  mutate(income = ifelse(income %in% c(1,2,3), income, NA))
 
 ```
 
+#  Depression score
+sum of scores for 9 items. Each item is scored as 0 (not at all) to 3 (nearly every day), which assesses the frequency of depression related symptoms.
+extracted from dataset Mental Health - Depression Screener  
+
+```{r depression}
+
+depression = read_xpt("data/mental_health.XPT") %>% 
+  janitor::clean_names()
+
+seqn = depression$seqn
+depression_subset = depression %>% select(-seqn)
+
+depression = map_dfc(depression_subset, ~ifelse(.x %in% c(0,1,2,3), .x, NA)) %>% 
+  mutate(depression_score = round(rowMeans(., na.rm = TRUE), 3)) %>% 
+  add_column(seqn) %>% 
+  select(seqn, depression_score)
+
+  
+```
 
 #blood pressure and cholesterol
 ever told you have high blood pressure, doctor ever told you have high cholesterol
