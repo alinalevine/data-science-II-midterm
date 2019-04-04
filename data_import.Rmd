@@ -31,10 +31,10 @@ https://wwwn.cdc.gov/Nchs/Nhanes/2015-2016/BPQ_I.htm
 
 ```{r}
 
-bp_chol = read_xpt("data/BPQ_I.xpt") %>% janitor::clean_names () %>%
-  select(seqn, bpq020, bpq080) %>%
-  mutate(bpq020 = ifelse(bpq020 == 9, NA, bpq020),
-         bpq080 = ifelse(! (bpq080 %in% c(1,2)), NA, bpq080 ))
+bp_chol = read_xpt("data/BPQ_I.xpt") %>% janitor::clean_names() %>%
+  select(seqn, highbp = bpq020, highchol = bpq080) %>%
+  mutate(highbp = ifelse(highbp == 9, NA, highbp),
+         highchol = ifelse(! (highchol %in% c(1,2)), NA, highchol))
 
 ```
 
