@@ -8,10 +8,9 @@ output: html_document
 ```{r setup, include=FALSE}
 
 library(Hmisc)
-library(SASxport)
 data(Alfalfa)
 library(tidyverse)
-
+library(haven)
 
 
 ```
@@ -25,10 +24,7 @@ https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Demographics
 ```{r}
 
 
-lookup.xport("data/demographics.XPT")
-
-demographics = read.xport("data/demographics.xpt") %>%
-  select(SEQN, RIDRETH1, RIAGENDR,INDHHIN2)
+demographics = read_xpt("data/demographics.XPT") %>% janitor::clean_names()
 
 ```
 
