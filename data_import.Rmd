@@ -7,9 +7,16 @@ output: html_document
 
 ```{r setup, include=FALSE}
 library(Hmisc)
+<<<<<<< HEAD
 library(xSASxport)
 data(Alfalfa)
 library(tidyverse)
+=======
+data(Alfalfa)
+library(tidyverse)
+library(haven)
+
+>>>>>>> 6f53fe0f592fd85874a906d98f372603be9d78cb
 
 ```
 
@@ -20,11 +27,17 @@ sequence number, hispanic ethnicity, age,Ttotal household income
 https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Demographics&CycleBeginYear=2015
 
 ```{r}
+<<<<<<< HEAD
 library(SASxport)
 lookup.xport("data/demographics.XPT")
 
 demographics = read.xport("data/demographics.xpt") %>%
   select(SEQN, RIDRETH1, RIAGENDR,INDHHIN2)
+=======
+
+
+demographics = read_xpt("data/demographics.XPT") %>% janitor::clean_names()
+>>>>>>> 6f53fe0f592fd85874a906d98f372603be9d78cb
 
 ```
 
@@ -45,3 +58,12 @@ bp_chol = read.xport("data/BPQ_I.xpt") %>%
 
 
 #
+
+```{r}
+lookup.xport("data/body_measures.xpt")
+
+body_measures = read.xport("data/body_measures.xpt") %>%
+  select(SEQN, BMXBMN)
+
+```
+
