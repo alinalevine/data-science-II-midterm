@@ -134,7 +134,7 @@ sum(is.na(coronary$disease))/length(coronary$SEQN)
 
 #alcohol
 
-had at least 12 drinks of alcohol/1 year, ever had 4/5 drinks every day
+had at least 12 drinks of alcohol/1 year (ever a moderate drinker), ever had 4/5 drinks every day
 
 ```{r}
 
