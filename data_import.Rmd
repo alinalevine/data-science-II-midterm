@@ -7,8 +7,6 @@ output: html_document
 
 ```{r setup, include=FALSE}
 
-library(Hmisc)
-data(Alfalfa)
 library(tidyverse)
 library(haven)
 
@@ -36,10 +34,10 @@ https://wwwn.cdc.gov/Nchs/Nhanes/2015-2016/BPQ_I.htm
 
 ```{r}
 
-lookup.xport("data/BPQ_I.xpt")
-
-bp_chol = read.xport("data/BPQ_I.xpt") %>%
-  select(SEQN, BPQ020, BPQ080)
+bp_chol = read_xpt("data/BPQ_I.xpt") %>% janitor::clean_names () %>%
+  select(seqn, bpq020, bpq080) %>%
+  mutate(bpq020 = ifelse(bpq020 == 9, NA, bpq020),
+         bpq080 = ifelse(! (bpq080 %in% c(1,2)), NA, bpq080 ))
 
 ```
 
@@ -47,10 +45,35 @@ bp_chol = read.xport("data/BPQ_I.xpt") %>%
 #
 
 ```{r}
-lookup.xport("data/body_measures.xpt")
 
-body_measures = read.xport("data/body_measures.xpt") %>%
-  select(SEQN, BMXBMN)
+body_measures = read_xpt("data/body_measures.xpt") %>% janitor::clean_names() %>%
+  select(seqn, bmxbmn)
 
 ```
+
+#smoking
+smoked at least 100 cigarettes in life
+
+```{r}
+
+smoking = read_xpt("data/smoking.xpt") %>% janitor::clean_names() %>%
+  select(seqn, smoked = smq020) %>%
+  mutate(smoked = ifelse(!(smoked %in% c(1,2)), NA, smoked))
+  
+
+```
+
+#alcohol
+
+had at least 12 drinks of alcohol/1 year, ever had 4/5 drinks every day
+
+```{r}
+
+alcohol = read_xpt("data/alcohol.xpt") %>% janitor::clean_names() %>%
+  select(seqn,drinker = alq101, heavy_drinker = alq151 ) %>%
+  mutate(heavy_drinker = ifelse(!(heavy_drinker %in% c(1,2)), NA, heavy_drinker),
+         drinker = ifelse(!(drinker %in% c(1,2)), NA, drinker))
+
+```
+
 
