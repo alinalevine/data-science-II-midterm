@@ -1,0 +1,37 @@
+---
+title: "LDA and QDA"
+author: "Alina Levine"
+date: "April 5, 2019"
+output: html_document
+---
+
+
+
+```{r}
+library(MASS)
+
+lda.fit <- lda(disease~., data = data_train)
+plot(lda.fit)
+```
+
+
+```{r}
+
+set.seed(1)
+model.lda <- train(x = dat[rowTrain,1:8],
+                   y = dat$diabetes[rowTrain],
+                   method = "lda",
+                   metric = "ROC",
+                   trControl = ctrl)
+
+```
+
+
+
+```{r}
+
+ggplot(full_data, aes(x = income, color = disease)) +
+  geom_histogram()
+
+```
+
