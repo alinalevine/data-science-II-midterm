@@ -303,10 +303,12 @@ sum(is.na(coronary$disease))/length(coronary$seqn)
 ```{r}
 
 full_data = plyr::join_all(list(demographics, income, depression, diabetes, smoking, diet_behavior, alcohol, medical_cond, coronary), by = "seqn", type = "inner") %>% 
-  filter(!is.na(disease))
+  filter(!is.na(disease)) %>% 
+  select(-seqn) %>% 
+  na.omit
 
 skimr::skim(full_data)
-full_data_no_missing = na.omit(full_data)
-# 6115 records 
+
+# 6115 records, 18 variables 
 ```
 
