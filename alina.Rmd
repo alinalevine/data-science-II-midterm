@@ -95,16 +95,24 @@ smoking = read_xpt("data/smoking.xpt") %>% janitor::clean_names() %>%
   select(seqn, smoked = smq020) %>%
   mutate(smoked = ifelse(!(smoked %in% c(1,2)), NA, smoked))
   
-body_measures = 
-  read_xpt("data/body_measures.xpt") %>% 
-  select(seqn = SEQN, 
-         bmi = BMXBMI)
 
-# proportion of missing value
-sum(is.na(body_measures$bmi))/length(body_measures$SEQN)
                                     
 ```
 
+
+
+#alcohol
+
+had at least 12 drinks of alcohol/1 year (ever a moderate drinker), ever had 4/5 drinks every day
+
+```{r}
+
+alcohol = read_xpt("data/alcohol.xpt") %>% janitor::clean_names() %>%
+  select(seqn,drinker = alq101, heavy_drinker = alq151 ) %>%
+  mutate(heavy_drinker = ifelse(!(heavy_drinker %in% c(1,2)), NA, heavy_drinker),
+         drinker = ifelse(!(drinker %in% c(1,2)), NA, drinker))
+
+```
 
 
 # Diet Behavior and Nutrition
@@ -125,6 +133,20 @@ diet_behavior =
 sum(is.na(diet_behavior$fast))/length(diet_behavior$SEQN)
 sum(is.na(diet_behavior$ready))/length(diet_behavior$SEQN)
 sum(is.na(diet_behavior$forzen))/length(diet_behavior$SEQN)
+```
+
+#body measures
+
+```{r}
+
+body_measures = 
+  read_xpt("data/body_measures.xpt") %>% 
+  select(seqn = SEQN, 
+         bmi = BMXBMI)
+
+# proportion of missing value
+sum(is.na(body_measures$bmi))/length(body_measures$SEQN)
+
 ```
 
 
@@ -172,19 +194,6 @@ coronary =
 
 # proportion of missing value
 sum(is.na(coronary$disease))/length(coronary$SEQN)
-```
-
-#alcohol
-
-had at least 12 drinks of alcohol/1 year (ever a moderate drinker), ever had 4/5 drinks every day
-
-```{r}
-
-alcohol = read_xpt("data/alcohol.xpt") %>% janitor::clean_names() %>%
-  select(seqn,drinker = alq101, heavy_drinker = alq151 ) %>%
-  mutate(heavy_drinker = ifelse(!(heavy_drinker %in% c(1,2)), NA, heavy_drinker),
-         drinker = ifelse(!(drinker %in% c(1,2)), NA, drinker))
-
 ```
 
 
