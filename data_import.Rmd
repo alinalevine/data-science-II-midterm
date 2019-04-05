@@ -70,6 +70,17 @@ depression = map_dfc(depression_subset, ~ifelse(.x %in% c(0,1,2,3), .x, NA)) %>%
   select(seqn, depression_score)
 ```
 
+#smoking
+smoked at least 100 cigarettes in life
+
+```{r}
+
+smoking = read_xpt("data/smoking.xpt") %>% janitor::clean_names() %>%
+  select(seqn, smoked = smq020) %>%
+  mutate(smoked = ifelse(!(smoked %in% c(1,2)), NA, smoked))
+
+```
+
 
 #blood pressure and cholesterol
 ever told you have high blood pressure, doctor ever told you have high cholesterol
@@ -85,34 +96,21 @@ bp_chol = read_xpt("data/BPQ_I.xpt") %>% janitor::clean_names() %>%
 
 ```
 
+#alcohol
 
-# Body Measure
-
-```{r}
-
-body_measures = read_xpt("data/body_measures.xpt") %>% janitor::clean_names() %>%
-  select(seqn, bmxbmn)
-
-```
-
-#smoking
-smoked at least 100 cigarettes in life
+had at least 12 drinks of alcohol/1 year (ever a moderate drinker), ever had 4/5 drinks every day
 
 ```{r}
 
-smoking = read_xpt("data/smoking.xpt") %>% janitor::clean_names() %>%
-  select(seqn, smoked = smq020) %>%
-  mutate(smoked = ifelse(!(smoked %in% c(1,2)), NA, smoked))
-  
-body_measures = 
-  read_xpt("data/body_measures.xpt") %>% 
-  select(SEQN, 
-         bmi = BMXBMI)
+alcohol = read_xpt("data/alcohol.xpt") %>% janitor::clean_names() %>%
+  select(seqn,drinker = alq101, heavy_drinker = alq151 ) %>%
+  mutate(heavy_drinker = ifelse(!(heavy_drinker %in% c(1,2)), NA, heavy_drinker),
+         drinker = ifelse(!(drinker %in% c(1,2)), NA, drinker))
 
-# proportion of missing value
-sum(is.na(body_measures$bmi))/length(body_measures$SEQN)
-                                    
 ```
+
+
+
 
 
 
@@ -138,6 +136,17 @@ sum(is.na(diet_behavior$ready))/length(diet_behavior$SEQN)
 sum(is.na(diet_behavior$forzen))/length(diet_behavior$SEQN)
 ```
 
+# Body Measure
+
+```{r}
+body_measures = 
+  read_xpt("data/body_measures.xpt") %>% 
+  select(SEQN, 
+         bmi = BMXBMI)
+
+# proportion of missing value
+sum(is.na(body_measures$bmi))/length(body_measures$SEQN)
+```
 
 # Diabetes
 
@@ -187,17 +196,6 @@ coronary =
 sum(is.na(coronary$disease))/length(coronary$SEQN)
 ```
 
-#alcohol
 
-had at least 12 drinks of alcohol/1 year (ever a moderate drinker), ever had 4/5 drinks every day
-
-```{r}
-
-alcohol = read_xpt("data/alcohol.xpt") %>% janitor::clean_names() %>%
-  select(seqn,drinker = alq101, heavy_drinker = alq151 ) %>%
-  mutate(heavy_drinker = ifelse(!(heavy_drinker %in% c(1,2)), NA, heavy_drinker),
-         drinker = ifelse(!(drinker %in% c(1,2)), NA, drinker))
-
-```
 
 
