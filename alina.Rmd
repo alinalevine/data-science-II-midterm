@@ -1,7 +1,7 @@
 ---
-title: "data_science_load_data"
-author: "Alina Levine"
-date: "April 2, 2019"
+title: "Jiyue_part"
+author: "JiyueQin"
+date: "April 5, 2019"
 output: html_document
 ---
 
@@ -9,6 +9,330 @@ output: html_document
 library(tidyverse)
 library(tidyverse)
 library(haven)
+
+```
+
+
+Here, we will import the separate datasets from year 15 and 14 and combine for further analysis.
+
+Our targets are participants who are 20 years older.
+
+
+# Demographics variables
+
+
+Age in years at screening: variable name RIDAGEYR
+Gender: variable name RIAGENDR
+Marital status: variable name DMDMARTL
+Race/ethinicity: Race/Hispanic origin w/ NH Asian, variable name RIDRETH3
+Citizenship status: variable name DMDCITZN
+Education level: Education level - Adults 20+, variable name DMDEDUC2
+
+
+sequence number, hispanic ethnicity, age,Ttotal household income
+
+https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Demographics&CycleBeginYear=2015
+
+
+```{r demo}
+demographics_2015 = read_xpt("data/demographics.XPT") %>% 
+  janitor::clean_names() %>%
+  select(seqn, age = ridageyr, gender = riagendr, marital = dmdmartl, race = ridreth3, citizen = dmdcitzn, education = dmdeduc2) %>% 
+  filter(age > 20)
+
+demographics_2014 = read_xpt("data/demographics_2014.XPT") %>% 
+  janitor::clean_names() %>%
+  select(seqn, age = ridageyr, gender = riagendr, marital = dmdmartl, race = ridreth3, citizen = dmdcitzn, education = dmdeduc2)  %>% 
+  filter(age > 20)
+
+demographics = bind_rows(demographics_2014, demographics_2015)
+
+```
+
+# Income
+
+Family monthly poverty level category, variable name: INDFMMPCSAS
+https://wwwn.cdc.gov/Nchs/Nhanes/2015-2016/INQ_I.htm#INDFMMPI 
+
+demographics = read_xpt("data/demographics.XPT") %>% janitor::clean_names()
+1	Monthly poverty level index <= 1.30;2	1.30 < Monthly poverty level index <= 1.85;3	Monthly poverty level index > 1.85
+
+```{r income}
+income_2015 = read_xpt("data/income.XPT") %>% 
+  janitor::clean_names() %>% 
+  select(seqn, income = indfmmpc) %>% 
+  mutate(income = ifelse(income %in% c(1,2,3), income, NA))
+
+income_2014 = read_xpt("data/income_2014.XPT") %>% 
+  janitor::clean_names() %>% 
+  select(seqn, income = indfmmpc) %>% 
+  mutate(income = ifelse(income %in% c(1,2,3), income, NA))
+
+income = bind_rows(income_2014, income_2015)
+```
+
+#  Depression score
+sum of scores for 9 items. Each item is scored as 0 (not at all) to 3 (nearly every day), which assesses the frequency of depression related symptoms.
+extracted from dataset Mental Health - Depression Screener  
+
+```{r depression}
+
+depression_2015 = read_xpt("data/mental_health.XPT") %>% 
+  janitor::clean_names()
+
+seqn = depression_2015$seqn
+depression_subset = depression_2015 %>% select(-seqn)
+depression_2015 = map_dfc(depression_subset, ~ifelse(.x %in% c(0,1,2,3), .x, NA)) %>% 
+  mutate(depression_score = round(rowMeans(., na.rm = TRUE), 3)) %>% 
+  add_column(seqn) %>% 
+  select(seqn, depression_score)
+
+depression_2014 = read_xpt("data/mental_health_2014.XPT") %>% 
+  janitor::clean_names()
+seqn = depression_2014$seqn
+depression_subset = depression_2014 %>% select(-seqn)
+depression_2014 = map_dfc(depression_subset, ~ifelse(.x %in% c(0,1,2,3), .x, NA)) %>% 
+  mutate(depression_score = round(rowMeans(., na.rm = TRUE), 3)) %>% 
+  add_column(seqn) %>% 
+  select(seqn, depression_score)
+
+depression = bind_rows(depression_2014, depression_2015)
+```
+
+#blood pressure and cholesterol
+ever told you have high blood pressure, doctor ever told you have high cholesterol
+
+https://wwwn.cdc.gov/Nchs/Nhanes/2015-2016/BPQ_I.htm
+
+```{r}
+
+bp_chol_2015 = read_xpt("data/bp_chol.xpt") %>% janitor::clean_names() %>%
+  select(seqn, highbp = bpq020, highchol = bpq080) %>%
+  mutate(highbp = ifelse(highbp == 9, NA, highbp),
+         highchol = ifelse(! (highchol %in% c(1,2)), NA, highchol))
+
+bp_chol_2014 = read_xpt("data/bp_chol_2014.xpt") %>% janitor::clean_names() %>%
+  select(seqn, highbp = bpq020, highchol = bpq080) %>%
+  mutate(highbp = ifelse(highbp == 9, NA, highbp),
+         highchol = ifelse(! (highchol %in% c(1,2)), NA, highchol))
+
+bp_chol = bind_rows(bp_chol_2014, bp_chol_2015)
+```
+
+
+#smoking
+smoked at least 100 cigarettes in life
+
+```{r}
+
+smoking_2015 = read_xpt("data/smoking.xpt") %>% janitor::clean_names() %>%
+  select(seqn, smoked = smq020) %>%
+  mutate(smoked = ifelse(!(smoked %in% c(1,2)), NA, smoked))
+  
+smoking_2014 = read_xpt("data/smoking_2014.xpt") %>% janitor::clean_names() %>%
+  select(seqn, smoked = smq020) %>%
+  mutate(smoked = ifelse(!(smoked %in% c(1,2)), NA, smoked))
+ 
+smoking = bind_rows(smoking_2014, smoking_2015)                                   
+```
+
+
+
+#alcohol
+
+had at least 12 drinks of alcohol/1 year (ever a moderate drinker), ever had 4/5 drinks every day
+
+```{r}
+
+alcohol_2015 = read_xpt("data/alcohol.xpt") %>% janitor::clean_names() %>%
+  select(seqn,drinker = alq101, heavy_drinker = alq151 ) %>%
+  mutate(heavy_drinker = ifelse(!(heavy_drinker %in% c(1,2)), NA, heavy_drinker),
+         drinker = ifelse(!(drinker %in% c(1,2)), NA, drinker))
+
+alcohol_2014 = read_xpt("data/alcohol_2014.xpt") %>% janitor::clean_names() %>%
+  select(seqn,drinker = alq101, heavy_drinker = alq151 ) %>%
+  mutate(heavy_drinker = ifelse(!(heavy_drinker %in% c(1,2)), NA, heavy_drinker),
+         drinker = ifelse(!(drinker %in% c(1,2)), NA, drinker))
+alcohol = bind_rows(alcohol_2014, alcohol_2015)
+```
+
+
+# Diet Behavior and Nutrition
+
+```{r}
+
+diet_behavior_2015 =
+  read_xpt("data/diet.xpt") %>% 
+  select(seqn = SEQN, 
+         fast = DBD900, 
+         ready = DBD905, 
+         forzen = DBD910) %>% 
+  filter(!fast %in% c(5555, 7777, 9999),
+         !ready %in% c(6666, 7777, 9999),
+         !forzen %in% c(6666, 7777, 9999))
+
+
+# proportion of missing value
+sum(is.na(diet_behavior_2015$fast))/length(diet_behavior_2015$seqn)
+sum(is.na(diet_behavior_2015$ready))/length(diet_behavior_2015$seqn)
+sum(is.na(diet_behavior_2015$forzen))/length(diet_behavior_2015$seqn)
+```
+
+```{r}
+
+diet_behavior_2014 =
+  read_xpt("data/diet_2014.xpt") %>% 
+  select(seqn = SEQN, 
+         fast = DBD900, 
+         ready = DBD905, 
+         forzen = DBD910) %>% 
+  filter(!fast %in% c(5555, 7777, 9999),
+         !ready %in% c(6666, 7777, 9999),
+         !forzen %in% c(6666, 7777, 9999))
+
+
+diet_behavior = rbind(diet_behavior_2014, diet_behavior_2015)
+
+# proportion of missing value
+sum(is.na(diet_behavior$fast))/length(diet_behavior$seqn)
+sum(is.na(diet_behavior$ready))/length(diet_behavior$seqn)
+sum(is.na(diet_behavior$forzen))/length(diet_behavior$seqn)
+```
+
+
+# Body Measure
+
+```{r}
+body_measures_2015 = 
+  read_xpt("data/body_measures.xpt") %>% 
+  select(seqn = SEQN, 
+         bmi = BMXBMI)
+
+# proportion of missing value
+sum(is.na(body_measures_2015$bmi))/length(body_measures_2015$seqn)
+```
+
+```{r}
+body_measures_2014 = 
+  read_xpt("data/body_measures_2014.xpt") %>% 
+  select(seqn = SEQN, 
+         bmi = BMXBMI)
+
+body_measures = rbind(body_measures_2014, body_measures_2015)
+```
+
+# Diabetes
+
+```{r}
+
+diabetes_2015 =
+  read_xpt("data/diabetes.xpt") %>% 
+  select(seqn = SEQN, 
+         diabete = DIQ010) %>% 
+  mutate(diabete = ifelse(!(diabete %in% c(1,2,3)), NA, diabete))
+
+
+diabetes_2014 =
+  read_xpt("data/diabetes_2014.xpt") %>% 
+  select(seqn = SEQN, 
+         diabete = DIQ010) %>% 
+  mutate(diabete = ifelse(!(diabete %in% c(1,2,3)), NA, diabete))
+
+diabetes = rbind(diabetes_2014, diabetes_2015)
+
+# proportion of missing value
+sum(is.na(diabetes$diabete))/length(diabetes$seqn)
+```
+
+# Medical Conditions
+
+```{r}
+
+medical_cond_2015 =
+  read_xpt("data/medical_cond.xpt") %>% 
+  select(seqn = SEQN, 
+         overweight = MCQ080, 
+         gout = MCQ160N) %>% 
+  mutate(overweight = ifelse(!(overweight %in% c(1,2)), NA, overweight),
+         gout = ifelse(!(gout %in% c(1,2)), NA, gout))
+
+medical_cond_2014 =
+  read_xpt("data/medical_cond_2014.xpt") %>% 
+  select(seqn = SEQN, 
+         overweight = MCQ080, 
+         gout = MCQ160N) %>% 
+  mutate(overweight = ifelse(!(overweight %in% c(1,2)), NA, overweight),
+         gout = ifelse(!(gout %in% c(1,2)), NA, gout))
+
+medical_cond = rbind(medical_cond_2014, medical_cond_2015)
+
+# proportion of missing value
+sum(is.na(medical_cond$overweight))/length(medical_cond$seqn)
+sum(is.na(medical_cond$gout))/length(medical_cond$seqn)
+```
+
+
+
+# Response
+
+```{r}
+coronary_2015 = 
+  read_xpt("data/medical_cond.xpt") %>% 
+  select(seqn = SEQN, 
+         disease = MCQ160C) %>% 
+  mutate(disease = ifelse(!(disease %in% c(1,2)), NA, disease))
+
+
+coronary_2014 = 
+  read_xpt("data/medical_cond_2014.xpt") %>% 
+  select(seqn = SEQN, 
+         disease = MCQ160C) %>% 
+  mutate(disease = ifelse(!(disease %in% c(1,2)), NA, disease))
+
+coronary = rbind(coronary_2014, coronary_2015)
+
+sum(is.na(coronary$disease))/length(coronary$seqn)
+```
+
+
+
+#variables we might need to remove: fast food, heavy drinker(but this is important one)
+
+
+
+```{r}
+
+full_data = plyr::join_all(list(demographics, income, depression, diabetes, smoking, diet_behavior, alcohol, medical_cond, coronary, body_measures), by = "seqn", type = "inner") %>% 
+  filter(!is.na(disease)) %>% 
+  dplyr::select(-seqn) %>% 
+  na.omit
+
+skimr::skim(full_data)
+
+# 6115 records, 18 variables 
+```
+
+
+
+#Recoding
+now we are changing yes to 1 and no to 0. changing all binary to 0 1 and all categorical to factors
+
+```{r}
+full_data = full_data %>%
+  mutate(citizen = as.factor(ifelse(2, 0, citizen))) %>%
+
+  
+full_data_binary_subset = full_data %>% dplyr::select(c(gender, citizen, diabete, smoked, drinker, heavy_drinker,overweight,gout, disease))
+
+full_data_non_binary = full_data %>%
+  dplyr::select(-c(gender, citizen, diabete, smoked, drinker, heavy_drinker,overweight,gout, disease))
+
+full_data = cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .x))), full_data_non_binary) %>%
+  mutate(marital = as.factor(marital),
+         race = as.factor(race),
+         income = as.factor(income),
+         education = as.factor(education))
+
 
 ```
 
