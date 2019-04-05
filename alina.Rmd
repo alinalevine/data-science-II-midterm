@@ -336,3 +336,20 @@ full_data = cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .
 
 ```
 
+#split training and test dataset
+
+
+```{r}
+
+library(caret)
+set.seed(1)
+rowTrain <- createDataPartition(y = full_data$disease,
+                                p = 0.75,
+                                list = FALSE)
+
+data_train = full_data[rowTrain,]
+data_test = full_data[-rowTrain,]
+
+
+```
+
