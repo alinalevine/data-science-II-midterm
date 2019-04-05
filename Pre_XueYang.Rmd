@@ -131,6 +131,24 @@ sum(is.na(diet_behavior$ready))/length(diet_behavior$seqn)
 sum(is.na(diet_behavior$forzen))/length(diet_behavior$seqn)
 ```
 
+```{r}
+lookup.xport("data/diet_2014.xpt")
+
+diet_behavior_2014 =
+  read_xpt("data/diet_2014.xpt") %>% 
+  select(seqn = SEQN, 
+         fast = DBD900, 
+         ready = DBD905, 
+         forzen = DBD910) %>% 
+  filter(!fast %in% c(5555, 7777, 9999),
+         !ready %in% c(6666, 7777, 9999),
+         !forzen %in% c(6666, 7777, 9999))
+
+
+diet_behavior_all = rbind(diet_behavior_2014, diet_behavior)
+```
+
+
 # Body Measure
 
 ```{r}
@@ -141,6 +159,15 @@ body_measures =
 
 # proportion of missing value
 sum(is.na(body_measures$bmi))/length(body_measures$seqn)
+```
+
+```{r}
+body_measures_2014 = 
+  read_xpt("data/body_measures_2014.xpt") %>% 
+  select(seqn = SEQN, 
+         bmi = BMXBMI)
+
+body_measures_all = rbind(body_measures_2014, body_measures)
 ```
 
 # Diabetes
@@ -156,6 +183,16 @@ diabetes =
 
 # proportion of missing value
 sum(is.na(diabetes$diabete))/length(diabetes$seqn)
+```
+
+```{r}
+diabetes_2014 =
+  read_xpt("data/diabetes_2014.xpt") %>% 
+  select(seqn = SEQN, 
+         diabete = DIQ010) %>% 
+  mutate(diabete = ifelse(!(diabete %in% c(1,2,3)), NA, diabete))
+
+diabetes_all = rbind(diabetes_2014, diabetes)
 ```
 
 # Medical Conditions
@@ -177,6 +214,17 @@ sum(is.na(medical_cond$overweight))/length(medical_cond$seqn)
 sum(is.na(medical_cond$gout))/length(medical_cond$seqn)
 ```
 
+```{r}
+medical_cond_2014 =
+  read_xpt("data/medical_cond_2014.xpt") %>% 
+  select(seqn = SEQN, 
+         overweight = MCQ080, 
+         gout = MCQ160N) %>% 
+  mutate(overweight = ifelse(!(overweight %in% c(1,2)), NA, overweight),
+         gout = ifelse(!(gout %in% c(1,2)), NA, gout))
+
+medical_cond_all = rbind(medical_cond_2014, medical_cond)
+```
 
 # Response
 
@@ -189,6 +237,16 @@ coronary =
 
 # proportion of missing value
 sum(is.na(coronary$disease))/length(coronary$seqn)
+```
+
+```{r}
+coronary_2014 = 
+  read_xpt("data/medical_cond_2014.xpt") %>% 
+  select(seqn = SEQN, 
+         disease = MCQ160C) %>% 
+  mutate(disease = ifelse(!(disease %in% c(1,2)), NA, disease))
+
+coronary_all = rbind(coronary_2014, coronary)
 ```
 
 
