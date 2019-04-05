@@ -318,20 +318,18 @@ skimr::skim(full_data)
 now we are changing yes to 1 and no to 0. changing all binary to 0 1 and all categorical to factors
 
 ```{r}
-full_data = full_data %>%
-  mutate(citizen = as.factor(ifelse(2, 0, citizen))) %>%
-
   
-full_data_binary_subset = full_data %>% dplyr::select(c(gender, citizen, diabete, smoked, drinker, heavy_drinker,overweight,gout, disease))
+full_data_binary_subset = full_data %>% dplyr::select(c(gender, citizen, smoked, drinker, heavy_drinker,overweight,gout, disease))
 
 full_data_non_binary = full_data %>%
-  dplyr::select(-c(gender, citizen, diabete, smoked, drinker, heavy_drinker,overweight,gout, disease))
+  dplyr::select(-c(gender, citizen,smoked, drinker, heavy_drinker,overweight,gout, disease))
 
 full_data = cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .x))), full_data_non_binary) %>%
   mutate(marital = as.factor(marital),
          race = as.factor(race),
          income = as.factor(income),
-         education = as.factor(education))
+         education = as.factor(education),
+         diabete = as.factor(diabete))
 
 
 ```
