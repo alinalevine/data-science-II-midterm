@@ -12,6 +12,18 @@ library(haven)
 ```
 
 
+```{r setup, include=FALSE}
+library(tidyverse)
+library(tidyverse)
+library(haven)
+```
+
+
+Here, we will import the separate datasets from year 15 and 14 and combine for further analysis.
+
+Our targets are participants who are 20 years older.
+
+
 # Demographics variables
 
 
@@ -29,10 +41,15 @@ https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Demographics
 
 
 ```{r demo}
-demographics = read_xpt("data/demographics.XPT") %>% 
+demographics_2015 = read_xpt("data/demographics.XPT") %>% 
   janitor::clean_names() %>%
-  select(seqn, ridageyr, riagendr, dmdmartl, ridreth3, dmdcitzn, dmdeduc2) %>% 
-  filter(ridageyr > 20)
+  select(seqn, age = ridageyr, gender = riagendr, marital = dmdmartl, race = ridreth3, citizen = dmdcitzn, education = dmdeduc2) %>% 
+  filter(age > 20)
+demographics_2014 = read_xpt("data/demographics_2014.XPT") %>% 
+  janitor::clean_names() %>%
+  select(seqn, age = ridageyr, gender = riagendr, marital = dmdmartl, race = ridreth3, citizen = dmdcitzn, education = dmdeduc2)  %>% 
+  filter(age > 20)
+demographics = bind_rows(demographics_2014, demographics_2015)
 ```
 
 # Income
@@ -44,10 +61,15 @@ demographics = read_xpt("data/demographics.XPT") %>% janitor::clean_names()
 1	Monthly poverty level index <= 1.30;2	1.30 < Monthly poverty level index <= 1.85;3	Monthly poverty level index > 1.85
 
 ```{r income}
-income = read_xpt("data/income.XPT") %>% 
+income_2015 = read_xpt("data/income.XPT") %>% 
   janitor::clean_names() %>% 
   select(seqn, income = indfmmpc) %>% 
   mutate(income = ifelse(income %in% c(1,2,3), income, NA))
+income_2014 = read_xpt("data/income_2014.XPT") %>% 
+  janitor::clean_names() %>% 
+  select(seqn, income = indfmmpc) %>% 
+  mutate(income = ifelse(income %in% c(1,2,3), income, NA))
+income = bind_rows(income_2014, income_2015)
 ```
 
 #  Depression score
@@ -55,27 +77,24 @@ sum of scores for 9 items. Each item is scored as 0 (not at all) to 3 (nearly ev
 extracted from dataset Mental Health - Depression Screener  
 
 ```{r depression}
-depression = read_xpt("data/mental_health.XPT") %>% 
+depression_2015 = read_xpt("data/mental_health.XPT") %>% 
   janitor::clean_names()
-seqn = depression$seqn
-depression_subset = depression %>% select(-seqn)
-depression = map_dfc(depression_subset, ~ifelse(.x %in% c(0,1,2,3), .x, NA)) %>% 
+seqn = depression_2015$seqn
+depression_subset = depression_2015 %>% select(-seqn)
+depression_2015 = map_dfc(depression_subset, ~ifelse(.x %in% c(0,1,2,3), .x, NA)) %>% 
   mutate(depression_score = round(rowMeans(., na.rm = TRUE), 3)) %>% 
   add_column(seqn) %>% 
   select(seqn, depression_score)
+depression_2014 = read_xpt("data/mental_health_2014.XPT") %>% 
+  janitor::clean_names()
+seqn = depression_2014$seqn
+depression_subset = depression_2014 %>% select(-seqn)
+depression_2014 = map_dfc(depression_subset, ~ifelse(.x %in% c(0,1,2,3), .x, NA)) %>% 
+  mutate(depression_score = round(rowMeans(., na.rm = TRUE), 3)) %>% 
+  add_column(seqn) %>% 
+  select(seqn, depression_score)
+depression = bind_rows(depression_2014, depression_2015)
 ```
-
-#smoking
-smoked at least 100 cigarettes in life
-
-```{r}
-
-smoking = read_xpt("data/smoking.xpt") %>% janitor::clean_names() %>%
-  select(seqn, smoked = smq020) %>%
-  mutate(smoked = ifelse(!(smoked %in% c(1,2)), NA, smoked))
-
-```
-
 
 #blood pressure and cholesterol
 ever told you have high blood pressure, doctor ever told you have high cholesterol
@@ -83,38 +102,56 @@ ever told you have high blood pressure, doctor ever told you have high cholester
 https://wwwn.cdc.gov/Nchs/Nhanes/2015-2016/BPQ_I.htm
 
 ```{r}
-
-bp_chol = read_xpt("data/BPQ_I.xpt") %>% janitor::clean_names() %>%
+bp_chol_2015 = read_xpt("data/bp_chol.xpt") %>% janitor::clean_names() %>%
   select(seqn, highbp = bpq020, highchol = bpq080) %>%
   mutate(highbp = ifelse(highbp == 9, NA, highbp),
          highchol = ifelse(! (highchol %in% c(1,2)), NA, highchol))
-
+bp_chol_2014 = read_xpt("data/bp_chol_2014.xpt") %>% janitor::clean_names() %>%
+  select(seqn, highbp = bpq020, highchol = bpq080) %>%
+  mutate(highbp = ifelse(highbp == 9, NA, highbp),
+         highchol = ifelse(! (highchol %in% c(1,2)), NA, highchol))
+bp_chol = bind_rows(bp_chol_2014, bp_chol_2015)
 ```
+
+
+#smoking
+smoked at least 100 cigarettes in life
+
+```{r}
+smoking_2015 = read_xpt("data/smoking.xpt") %>% janitor::clean_names() %>%
+  select(seqn, smoked = smq020) %>%
+  mutate(smoked = ifelse(!(smoked %in% c(1,2)), NA, smoked))
+  
+smoking_2014 = read_xpt("data/smoking_2014.xpt") %>% janitor::clean_names() %>%
+  select(seqn, smoked = smq020) %>%
+  mutate(smoked = ifelse(!(smoked %in% c(1,2)), NA, smoked))
+ 
+smoking = bind_rows(smoking_2014, smoking_2015)                                   
+```
+
+
 
 #alcohol
 
 had at least 12 drinks of alcohol/1 year (ever a moderate drinker), ever had 4/5 drinks every day
 
 ```{r}
-
-alcohol = read_xpt("data/alcohol.xpt") %>% janitor::clean_names() %>%
+alcohol_2015 = read_xpt("data/alcohol.xpt") %>% janitor::clean_names() %>%
   select(seqn,drinker = alq101, heavy_drinker = alq151 ) %>%
   mutate(heavy_drinker = ifelse(!(heavy_drinker %in% c(1,2)), NA, heavy_drinker),
          drinker = ifelse(!(drinker %in% c(1,2)), NA, drinker))
-
+alcohol_2014 = read_xpt("data/alcohol_2014.xpt") %>% janitor::clean_names() %>%
+  select(seqn,drinker = alq101, heavy_drinker = alq151 ) %>%
+  mutate(heavy_drinker = ifelse(!(heavy_drinker %in% c(1,2)), NA, heavy_drinker),
+         drinker = ifelse(!(drinker %in% c(1,2)), NA, drinker))
+alcohol = bind_rows(alcohol_2014, alcohol_2015)
 ```
-
-
-
-
 
 
 # Diet Behavior and Nutrition
 
 ```{r}
-lookup.xport("data/diet.xpt")
-
-diet_behavior =
+diet_behavior_2015 =
   read_xpt("data/diet.xpt") %>% 
   select(seqn = SEQN, 
          fast = DBD900, 
@@ -123,17 +160,13 @@ diet_behavior =
   filter(!fast %in% c(5555, 7777, 9999),
          !ready %in% c(6666, 7777, 9999),
          !forzen %in% c(6666, 7777, 9999))
-
-
 # proportion of missing value
-sum(is.na(diet_behavior$fast))/length(diet_behavior$seqn)
-sum(is.na(diet_behavior$ready))/length(diet_behavior$seqn)
-sum(is.na(diet_behavior$forzen))/length(diet_behavior$seqn)
+sum(is.na(diet_behavior_2015$fast))/length(diet_behavior_2015$seqn)
+sum(is.na(diet_behavior_2015$ready))/length(diet_behavior_2015$seqn)
+sum(is.na(diet_behavior_2015$forzen))/length(diet_behavior_2015$seqn)
 ```
 
 ```{r}
-lookup.xport("data/diet_2014.xpt")
-
 diet_behavior_2014 =
   read_xpt("data/diet_2014.xpt") %>% 
   select(seqn = SEQN, 
@@ -143,22 +176,23 @@ diet_behavior_2014 =
   filter(!fast %in% c(5555, 7777, 9999),
          !ready %in% c(6666, 7777, 9999),
          !forzen %in% c(6666, 7777, 9999))
-
-
-diet_behavior_all = rbind(diet_behavior_2014, diet_behavior)
+diet_behavior = rbind(diet_behavior_2014, diet_behavior_2015)
+# proportion of missing value
+sum(is.na(diet_behavior$fast))/length(diet_behavior$seqn)
+sum(is.na(diet_behavior$ready))/length(diet_behavior$seqn)
+sum(is.na(diet_behavior$forzen))/length(diet_behavior$seqn)
 ```
 
 
 # Body Measure
 
 ```{r}
-body_measures = 
+body_measures_2015 = 
   read_xpt("data/body_measures.xpt") %>% 
   select(seqn = SEQN, 
          bmi = BMXBMI)
-
 # proportion of missing value
-sum(is.na(body_measures$bmi))/length(body_measures$seqn)
+sum(is.na(body_measures_2015$bmi))/length(body_measures_2015$seqn)
 ```
 
 ```{r}
@@ -166,55 +200,37 @@ body_measures_2014 =
   read_xpt("data/body_measures_2014.xpt") %>% 
   select(seqn = SEQN, 
          bmi = BMXBMI)
-
-body_measures_all = rbind(body_measures_2014, body_measures)
+body_measures = rbind(body_measures_2014, body_measures_2015)
 ```
 
 # Diabetes
 
 ```{r}
-lookup.xport("data/diabetes.xpt")
-
-diabetes =
+diabetes_2015 =
   read_xpt("data/diabetes.xpt") %>% 
   select(seqn = SEQN, 
          diabete = DIQ010) %>% 
   mutate(diabete = ifelse(!(diabete %in% c(1,2,3)), NA, diabete))
-
-# proportion of missing value
-sum(is.na(diabetes$diabete))/length(diabetes$seqn)
-```
-
-```{r}
 diabetes_2014 =
   read_xpt("data/diabetes_2014.xpt") %>% 
   select(seqn = SEQN, 
          diabete = DIQ010) %>% 
   mutate(diabete = ifelse(!(diabete %in% c(1,2,3)), NA, diabete))
-
-diabetes_all = rbind(diabetes_2014, diabetes)
+diabetes = rbind(diabetes_2014, diabetes_2015)
+# proportion of missing value
+sum(is.na(diabetes$diabete))/length(diabetes$seqn)
 ```
 
 # Medical Conditions
 
 ```{r}
-lookup.xport("data/medical_cond.xpt")
-
-medical_cond =
+medical_cond_2015 =
   read_xpt("data/medical_cond.xpt") %>% 
   select(seqn = SEQN, 
          overweight = MCQ080, 
          gout = MCQ160N) %>% 
   mutate(overweight = ifelse(!(overweight %in% c(1,2)), NA, overweight),
          gout = ifelse(!(gout %in% c(1,2)), NA, gout))
-
-
-# proportion of missing value
-sum(is.na(medical_cond$overweight))/length(medical_cond$seqn)
-sum(is.na(medical_cond$gout))/length(medical_cond$seqn)
-```
-
-```{r}
 medical_cond_2014 =
   read_xpt("data/medical_cond_2014.xpt") %>% 
   select(seqn = SEQN, 
@@ -222,62 +238,88 @@ medical_cond_2014 =
          gout = MCQ160N) %>% 
   mutate(overweight = ifelse(!(overweight %in% c(1,2)), NA, overweight),
          gout = ifelse(!(gout %in% c(1,2)), NA, gout))
-
-medical_cond_all = rbind(medical_cond_2014, medical_cond)
+medical_cond = rbind(medical_cond_2014, medical_cond_2015)
+# proportion of missing value
+sum(is.na(medical_cond$overweight))/length(medical_cond$seqn)
+sum(is.na(medical_cond$gout))/length(medical_cond$seqn)
 ```
+
+
 
 # Response
 
 ```{r}
-coronary = 
+coronary_2015 = 
   read_xpt("data/medical_cond.xpt") %>% 
   select(seqn = SEQN, 
          disease = MCQ160C) %>% 
   mutate(disease = ifelse(!(disease %in% c(1,2)), NA, disease))
-
-# proportion of missing value
-sum(is.na(coronary$disease))/length(coronary$seqn)
-```
-
-```{r}
 coronary_2014 = 
   read_xpt("data/medical_cond_2014.xpt") %>% 
   select(seqn = SEQN, 
          disease = MCQ160C) %>% 
   mutate(disease = ifelse(!(disease %in% c(1,2)), NA, disease))
-
-coronary_all = rbind(coronary_2014, coronary)
+coronary = rbind(coronary_2014, coronary_2015)
+sum(is.na(coronary$disease))/length(coronary$seqn)
 ```
 
 
-#variables we might need to remove: fast food (27.7%), heavy drinker(but this is important one)
+
+#variables we might need to remove: fast food, heavy drinker(but this is important one)
+
+
+
+```{r}
+full_data = 
+  plyr::join_all(list(demographics, income, depression, diabetes, smoking, diet_behavior, alcohol, medical_cond, coronary), by = "seqn", type = "inner") %>% 
+  filter(!is.na(disease)) %>% 
+  select(-seqn) %>% 
+  na.omit
+
+skimr::skim(full_data)
+# 6115 records, 18 variables 
+```
+
+# Recoding
+now we are changing yes to 1 and no to 0. changing all binary to 0 1 and all categorical to factors
+
+```{r}
+full_data = 
+  full_data %>%
+  mutate(citizen = as.factor(ifelse(2, 0, citizen))) 
+
+  
+full_data_binary_subset = 
+  full_data %>% 
+  dplyr::select(c(gender, citizen, diabete, smoked, drinker, heavy_drinker, overweight, gout, disease))
+
+full_data_non_binary = 
+  full_data %>%
+  dplyr::select(-c(gender, citizen, diabete, smoked, drinker, heavy_drinker,overweight,gout, disease))
+
+full_data = 
+  cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .x))), full_data_non_binary) %>%
+  mutate(marital = as.factor(marital),
+         race = as.factor(race),
+         income = as.factor(income),
+         education = as.factor(education))
+
+
+```
+
+#split training and test dataset
 
 
 ```{r}
 
-merged_x_df = demographics %>%
-  left_join(income) %>%
-  left_join(depression) %>%
-  left_join(diabetes) %>%
-  left_join(smoking) %>%
-  left_join(diet_behavior) %>%
-  left_join(alcohol) %>%
-  left_join(medical_cond)
+library(caret)
+set.seed(1)
+rowTrain <- createDataPartition(y = full_data$disease,
+                                p = 0.75,
+                                list = FALSE)
 
-full_data = coronary %>%
-  inner_join(merged_x_df) %>%
-  filter(!is.na(disease))
+data_train = full_data[rowTrain,]
+data_test = full_data[-rowTrain,]
 
-summary(full_data)
-
-full_data_no_missing = na.omit(full_data)
-
-full_data1 = coronary %>%
-  inner_join(merged_x_df) %>%
-  filter(!is.na(disease)) %>% 
-  filter(!is.na(heavy_drinker)) %>% 
-  filter(!is.na(fast))
-summary(full_data1)
-dim(full_data1)
 ```
 
