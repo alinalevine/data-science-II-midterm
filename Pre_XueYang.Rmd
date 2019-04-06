@@ -9,14 +9,12 @@ output: html_document
 library(tidyverse)
 library(tidyverse)
 library(haven)
+library(corrplot)
+library(caret)
+library(pROC)
 ```
 
 
-```{r setup, include=FALSE}
-library(tidyverse)
-library(tidyverse)
-library(haven)
-```
 
 
 Here, we will import the separate datasets from year 15 and 14 and combine for further analysis.
@@ -45,11 +43,16 @@ demographics_2015 = read_xpt("data/demographics.XPT") %>%
   janitor::clean_names() %>%
   select(seqn, age = ridageyr, gender = riagendr, marital = dmdmartl, race = ridreth3, citizen = dmdcitzn, education = dmdeduc2) %>% 
   filter(age > 20)
+
 demographics_2014 = read_xpt("data/demographics_2014.XPT") %>% 
   janitor::clean_names() %>%
   select(seqn, age = ridageyr, gender = riagendr, marital = dmdmartl, race = ridreth3, citizen = dmdcitzn, education = dmdeduc2)  %>% 
   filter(age > 20)
-demographics = bind_rows(demographics_2014, demographics_2015)
+
+demographics = bind_rows(demographics_2014, demographics_2015) %>% 
+  mutate(citizen = ifelse(citizen %in% c(1,2), citizen, NA),
+         marital = ifelse(citizen %in% c(1:6), citizen, NA))
+
 ```
 
 # Income
@@ -65,10 +68,12 @@ income_2015 = read_xpt("data/income.XPT") %>%
   janitor::clean_names() %>% 
   select(seqn, income = indfmmpc) %>% 
   mutate(income = ifelse(income %in% c(1,2,3), income, NA))
+
 income_2014 = read_xpt("data/income_2014.XPT") %>% 
   janitor::clean_names() %>% 
   select(seqn, income = indfmmpc) %>% 
   mutate(income = ifelse(income %in% c(1,2,3), income, NA))
+
 income = bind_rows(income_2014, income_2015)
 ```
 
@@ -77,14 +82,17 @@ sum of scores for 9 items. Each item is scored as 0 (not at all) to 3 (nearly ev
 extracted from dataset Mental Health - Depression Screener  
 
 ```{r depression}
+
 depression_2015 = read_xpt("data/mental_health.XPT") %>% 
   janitor::clean_names()
+
 seqn = depression_2015$seqn
 depression_subset = depression_2015 %>% select(-seqn)
 depression_2015 = map_dfc(depression_subset, ~ifelse(.x %in% c(0,1,2,3), .x, NA)) %>% 
   mutate(depression_score = round(rowMeans(., na.rm = TRUE), 3)) %>% 
   add_column(seqn) %>% 
   select(seqn, depression_score)
+
 depression_2014 = read_xpt("data/mental_health_2014.XPT") %>% 
   janitor::clean_names()
 seqn = depression_2014$seqn
@@ -93,6 +101,7 @@ depression_2014 = map_dfc(depression_subset, ~ifelse(.x %in% c(0,1,2,3), .x, NA)
   mutate(depression_score = round(rowMeans(., na.rm = TRUE), 3)) %>% 
   add_column(seqn) %>% 
   select(seqn, depression_score)
+
 depression = bind_rows(depression_2014, depression_2015)
 ```
 
@@ -102,14 +111,17 @@ ever told you have high blood pressure, doctor ever told you have high cholester
 https://wwwn.cdc.gov/Nchs/Nhanes/2015-2016/BPQ_I.htm
 
 ```{r}
+
 bp_chol_2015 = read_xpt("data/bp_chol.xpt") %>% janitor::clean_names() %>%
   select(seqn, highbp = bpq020, highchol = bpq080) %>%
   mutate(highbp = ifelse(highbp == 9, NA, highbp),
          highchol = ifelse(! (highchol %in% c(1,2)), NA, highchol))
+
 bp_chol_2014 = read_xpt("data/bp_chol_2014.xpt") %>% janitor::clean_names() %>%
   select(seqn, highbp = bpq020, highchol = bpq080) %>%
   mutate(highbp = ifelse(highbp == 9, NA, highbp),
          highchol = ifelse(! (highchol %in% c(1,2)), NA, highchol))
+
 bp_chol = bind_rows(bp_chol_2014, bp_chol_2015)
 ```
 
@@ -118,6 +130,7 @@ bp_chol = bind_rows(bp_chol_2014, bp_chol_2015)
 smoked at least 100 cigarettes in life
 
 ```{r}
+
 smoking_2015 = read_xpt("data/smoking.xpt") %>% janitor::clean_names() %>%
   select(seqn, smoked = smq020) %>%
   mutate(smoked = ifelse(!(smoked %in% c(1,2)), NA, smoked))
@@ -136,10 +149,12 @@ smoking = bind_rows(smoking_2014, smoking_2015)
 had at least 12 drinks of alcohol/1 year (ever a moderate drinker), ever had 4/5 drinks every day
 
 ```{r}
+
 alcohol_2015 = read_xpt("data/alcohol.xpt") %>% janitor::clean_names() %>%
   select(seqn,drinker = alq101, heavy_drinker = alq151 ) %>%
   mutate(heavy_drinker = ifelse(!(heavy_drinker %in% c(1,2)), NA, heavy_drinker),
          drinker = ifelse(!(drinker %in% c(1,2)), NA, drinker))
+
 alcohol_2014 = read_xpt("data/alcohol_2014.xpt") %>% janitor::clean_names() %>%
   select(seqn,drinker = alq101, heavy_drinker = alq151 ) %>%
   mutate(heavy_drinker = ifelse(!(heavy_drinker %in% c(1,2)), NA, heavy_drinker),
@@ -151,6 +166,7 @@ alcohol = bind_rows(alcohol_2014, alcohol_2015)
 # Diet Behavior and Nutrition
 
 ```{r}
+
 diet_behavior_2015 =
   read_xpt("data/diet.xpt") %>% 
   select(seqn = SEQN, 
@@ -160,13 +176,13 @@ diet_behavior_2015 =
   filter(!fast %in% c(5555, 7777, 9999),
          !ready %in% c(6666, 7777, 9999),
          !forzen %in% c(6666, 7777, 9999))
-# proportion of missing value
-sum(is.na(diet_behavior_2015$fast))/length(diet_behavior_2015$seqn)
-sum(is.na(diet_behavior_2015$ready))/length(diet_behavior_2015$seqn)
-sum(is.na(diet_behavior_2015$forzen))/length(diet_behavior_2015$seqn)
+
+
+
 ```
 
 ```{r}
+
 diet_behavior_2014 =
   read_xpt("data/diet_2014.xpt") %>% 
   select(seqn = SEQN, 
@@ -176,11 +192,11 @@ diet_behavior_2014 =
   filter(!fast %in% c(5555, 7777, 9999),
          !ready %in% c(6666, 7777, 9999),
          !forzen %in% c(6666, 7777, 9999))
+
+
 diet_behavior = rbind(diet_behavior_2014, diet_behavior_2015)
-# proportion of missing value
-sum(is.na(diet_behavior$fast))/length(diet_behavior$seqn)
-sum(is.na(diet_behavior$ready))/length(diet_behavior$seqn)
-sum(is.na(diet_behavior$forzen))/length(diet_behavior$seqn)
+
+
 ```
 
 
@@ -191,8 +207,8 @@ body_measures_2015 =
   read_xpt("data/body_measures.xpt") %>% 
   select(seqn = SEQN, 
          bmi = BMXBMI)
-# proportion of missing value
-sum(is.na(body_measures_2015$bmi))/length(body_measures_2015$seqn)
+
+
 ```
 
 ```{r}
@@ -200,30 +216,36 @@ body_measures_2014 =
   read_xpt("data/body_measures_2014.xpt") %>% 
   select(seqn = SEQN, 
          bmi = BMXBMI)
+
 body_measures = rbind(body_measures_2014, body_measures_2015)
 ```
 
 # Diabetes
 
 ```{r}
+
 diabetes_2015 =
   read_xpt("data/diabetes.xpt") %>% 
   select(seqn = SEQN, 
          diabete = DIQ010) %>% 
   mutate(diabete = ifelse(!(diabete %in% c(1,2,3)), NA, diabete))
+
+
 diabetes_2014 =
   read_xpt("data/diabetes_2014.xpt") %>% 
   select(seqn = SEQN, 
          diabete = DIQ010) %>% 
   mutate(diabete = ifelse(!(diabete %in% c(1,2,3)), NA, diabete))
+
 diabetes = rbind(diabetes_2014, diabetes_2015)
-# proportion of missing value
-sum(is.na(diabetes$diabete))/length(diabetes$seqn)
+
+
 ```
 
 # Medical Conditions
 
 ```{r}
+
 medical_cond_2015 =
   read_xpt("data/medical_cond.xpt") %>% 
   select(seqn = SEQN, 
@@ -231,6 +253,7 @@ medical_cond_2015 =
          gout = MCQ160N) %>% 
   mutate(overweight = ifelse(!(overweight %in% c(1,2)), NA, overweight),
          gout = ifelse(!(gout %in% c(1,2)), NA, gout))
+
 medical_cond_2014 =
   read_xpt("data/medical_cond_2014.xpt") %>% 
   select(seqn = SEQN, 
@@ -238,10 +261,10 @@ medical_cond_2014 =
          gout = MCQ160N) %>% 
   mutate(overweight = ifelse(!(overweight %in% c(1,2)), NA, overweight),
          gout = ifelse(!(gout %in% c(1,2)), NA, gout))
+
 medical_cond = rbind(medical_cond_2014, medical_cond_2015)
-# proportion of missing value
-sum(is.na(medical_cond$overweight))/length(medical_cond$seqn)
-sum(is.na(medical_cond$gout))/length(medical_cond$seqn)
+
+
 ```
 
 
@@ -254,65 +277,83 @@ coronary_2015 =
   select(seqn = SEQN, 
          disease = MCQ160C) %>% 
   mutate(disease = ifelse(!(disease %in% c(1,2)), NA, disease))
+
+
 coronary_2014 = 
   read_xpt("data/medical_cond_2014.xpt") %>% 
   select(seqn = SEQN, 
          disease = MCQ160C) %>% 
   mutate(disease = ifelse(!(disease %in% c(1,2)), NA, disease))
+
 coronary = rbind(coronary_2014, coronary_2015)
-sum(is.na(coronary$disease))/length(coronary$seqn)
+
+
 ```
 
 
 
-#variables we might need to remove: fast food, heavy drinker(but this is important one)
 
 
 
 ```{r}
-full_data = 
-  plyr::join_all(list(demographics, income, depression, diabetes, smoking, diet_behavior, alcohol, medical_cond, coronary), by = "seqn", type = "inner") %>% 
+
+full_data = plyr::join_all(list(demographics, income, depression, diabetes, smoking, diet_behavior, alcohol, medical_cond, coronary, body_measures), by = "seqn", type = "inner") %>% 
   filter(!is.na(disease)) %>% 
-  select(-seqn) %>% 
+  dplyr::select(-seqn) %>% 
   na.omit
 
 skimr::skim(full_data)
+
 # 6115 records, 18 variables 
 ```
 
-# Recoding
+
+
+#Recoding
 now we are changing yes to 1 and no to 0. changing all binary to 0 1 and all categorical to factors
 
 ```{r}
-full_data = 
-  full_data %>%
-  mutate(citizen = as.factor(ifelse(2, 0, citizen))) 
-
   
-full_data_binary_subset = 
-  full_data %>% 
-  dplyr::select(c(gender, citizen, diabete, smoked, drinker, heavy_drinker, overweight, gout, disease))
+full_data_binary_subset = full_data %>% 
+  select(c(gender, citizen, smoked, drinker, heavy_drinker,overweight,gout, disease))
 
-full_data_non_binary = 
-  full_data %>%
-  dplyr::select(-c(gender, citizen, diabete, smoked, drinker, heavy_drinker,overweight,gout, disease))
+full_data_non_binary = full_data %>%
+  select(-c(gender, citizen,smoked, drinker, heavy_drinker,overweight,gout, disease))
 
-full_data = 
-  cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .x))), full_data_non_binary) %>%
+full_data = cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .x))), full_data_non_binary) %>%
   mutate(marital = as.factor(marital),
          race = as.factor(race),
          income = as.factor(income),
-         education = as.factor(education))
+         education = as.factor(education),
+         diabete = as.factor(diabete)) %>% 
+  mutate(disease = recode(disease, "0" = "neg", "1" = "pos")) %>% 
+  select(disease, everything())
 
+# write.csv(full_data, "data/full_data.csv", row.names = FALSE)
+```
+
+
+# data preprocessing
+
+```{r pre}
+
+# remove low variance predictors
+x_full =  model.matrix(disease~., full_data)[,-1]
+
+x = x_full[, -nearZeroVar(x_full)]   # 24 predictors, remove gout1, race7, diabite3
+
+# check collinarity 
+corrplot(cor(x))
+# high correlation in marital2 and citizen1, romove marital2
+x = x[, -8]               #  23 predictors
 
 ```
+
 
 #split training and test dataset
 
 
 ```{r}
-
-library(caret)
 set.seed(1)
 rowTrain <- createDataPartition(y = full_data$disease,
                                 p = 0.75,
@@ -321,5 +362,91 @@ rowTrain <- createDataPartition(y = full_data$disease,
 data_train = full_data[rowTrain,]
 data_test = full_data[-rowTrain,]
 
+x_train = x[rowTrain,]
+x_test = x[-rowTrain,]
+
+y_train = data_train$disease
+y_test = data_test$disease
 ```
+
+
+
+
+
+# Model Building
+
+## Naive Bayes
+
+```{r, warning=FALSE}
+set.seed(1)
+
+ctrl <- trainControl(method = "repeatedcv",
+                     repeats = 5,
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE)
+
+nbGrid <- expand.grid(usekernel = c(FALSE,TRUE), # false: Guassian density as density for each feature; true: non-parametric kernel estimate as density for each feature
+                      fL = 0:1, # laplace correction: correction of 0 density case
+                      adjust = seq(0,5,by = 1)) # specify the bandwidth
+set.seed(1)
+model.nb <- train(x_train,
+                  y_train,
+                  method = "nb",
+                  tuneGrid = nbGrid,
+                  metric = "ROC",
+                  trControl = ctrl)
+
+plot(model.nb)
+model.nb$bestTune
+#    fL usekernel adjust
+# 15  0      TRUE      2
+```
+
+Evaluate the test set performance using ROC:
+
+```{r, warning=FALSE}
+nb.pred <- predict(model.nb, newdata = x_test, type = "prob")[,2]
+
+roc.nb <- roc(y_test, nb.pred)
+roc.nb$auc 
+# Area under the curve: 0.8367
+plot(roc.nb, legacy.axes = TRUE, print.auc = TRUE)
+```
+
+
+
+
+## KNN
+
+
+```{r}
+# KNN
+set.seed(1)
+model.knn <- train(x_train,
+                   y_train,
+                   method = "knn",
+                   metric = "ROC",
+                   preProcess = c("center","scale"), 
+                   tuneGrid = data.frame(k = seq(1,500,by=5)),
+                   trControl = ctrl)
+dev.off()
+ggplot(model.knn)
+model.knn$bestTune
+#  k
+# 85 421
+```
+
+Evaluate the test set performance using ROC:
+```{r}
+#trans = preProcess(x_train, method = c("center","scale"))
+#knn.pred <- predict(model.knn$finalModel, newdata = predict(trans,x_test), type = "prob")[,2]
+
+knn.pred <- predict.train(model.knn, newdata = x_test, type = "prob")[,2]
+roc.knn <- roc(y_test, knn.pred)
+roc.knn$auc
+# Area under the curve: 0.8637
+plot(roc.knn, legacy.axes = TRUE, print.auc = TRUE)
+```
+
+
 
