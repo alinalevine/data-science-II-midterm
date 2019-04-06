@@ -407,9 +407,13 @@ Evaluate the test set performance using ROC:
 ```{r, warning=FALSE}
 nb.pred <- predict(model.nb, newdata = x_test, type = "prob")[,2]
 
-roc.nb <- roc(y_test, nb.pred)
+roc.nb <- roc(y_test, nb.pred, levels = c("neg", "pos"))
 roc.nb$auc 
 # Area under the curve: 0.8367
+mean(roc.nb$sensitivities)
+# [1] 0.8233467
+mean(roc.nb$specificities)
+# [1] 0.5130937
 plot(roc.nb, legacy.axes = TRUE, print.auc = TRUE)
 ```
 
@@ -442,9 +446,13 @@ Evaluate the test set performance using ROC:
 #knn.pred <- predict(model.knn$finalModel, newdata = predict(trans,x_test), type = "prob")[,2]
 
 knn.pred <- predict.train(model.knn, newdata = x_test, type = "prob")[,2]
-roc.knn <- roc(y_test, knn.pred)
+roc.knn <- roc(y_test, knn.pred, levels = c("neg", "pos"))
 roc.knn$auc
 # Area under the curve: 0.8637
+mean(roc.knn$sensitivities)
+# [1] 0.6500978
+mean(roc.knn$specificities)
+# [1] 0.6757431
 plot(roc.knn, legacy.axes = TRUE, print.auc = TRUE)
 ```
 
@@ -466,4 +474,5 @@ modelNames <- c("nb","knn")
 legend("bottomright", legend = paste0(modelNames, ": ", round(auc,3)),
        col = 1:2, lwd = 2)
 ```
+
 
