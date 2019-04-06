@@ -1,0 +1,71 @@
+---
+title: "LDA and QDA"
+author: "Alina Levine"
+date: "April 5, 2019"
+output: html_document
+---
+
+
+
+```{r}
+library(MASS)
+
+lda.fit <- lda(disease~., data = data_train)
+plot(lda.fit)
+```
+
+
+```{r}
+
+#levels can't start with number
+
+
+data_train = data_train %>%
+  mutate(diabete = make.names(diabete),
+         income = make.names(income),
+         education = make.names(education),
+         race = make.names(race),
+         marital = make.names(marital),
+         gout = make.names(gout),
+         overweight = make.names(overweight),
+         heavy_drinker = make.names(heavy_drinker),
+         drinker = make.names(drinker),
+         smoked = make.names(smoked),
+         citizen = make.names(citizen),
+         gender = make.names(gender),
+         disease = make.names(disease))
+
+ctrl <- trainControl(method = "repeatedcv",
+                     repeats = 5,
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE)
+
+data_train = data_train %>%
+  dplyr::select(disease,everything())
+
+  set.seed(1)
+model.lda <- train(x = data_train[, c(1, 3:9, 11:19)],
+                   y = data_train$disease,
+                   method = "lda",
+                   metric = "ROC",
+                   trControl = ctrl)
+data_train_res  = data_train %>% mutate(disease = recode(disease, "0" = "neg", "1" = "pos"))
+df = map_dfc(data_train %>% dplyr::select(-age, -depression_score, -fast, -ready, -forzen, -bmi), ~factor(.x)) %>% add_column(data_train %>% dplyr::select(age, depression_score, fast, ready, forzen, bmi))
+###########jiyue edit  this works#
+model2 =  train(x , y = data_train$disease,
+                   method = "lda",
+                   metric = "ROC",
+                   trControl = ctrl)
+
+################
+```
+
+
+
+```{r}
+
+ggplot(full_data, aes(x = income, color = disease)) +
+  geom_histogram()
+
+```
+
