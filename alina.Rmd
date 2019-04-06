@@ -1,14 +1,14 @@
 ---
-title: "data_science_load_data"
-author: "Alina Levine"
-date: "April 2, 2019"
+title: "Jiyue_part"
+author: "JiyueQin"
+date: "April 5, 2019"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 library(tidyverse)
+library(tidyverse)
 library(haven)
-library(caret)
 
 ```
 
@@ -45,9 +45,7 @@ demographics_2014 = read_xpt("data/demographics_2014.XPT") %>%
   select(seqn, age = ridageyr, gender = riagendr, marital = dmdmartl, race = ridreth3, citizen = dmdcitzn, education = dmdeduc2)  %>% 
   filter(age > 20)
 
-demographics = bind_rows(demographics_2014, demographics_2015) %>% 
-  mutate(citizen = ifelse(citizen %in% c(1,2), citizen, NA),
-         marital = ifelse(citizen %in% c(1:6), citizen, NA))
+demographics = bind_rows(demographics_2014, demographics_2015)
 
 ```
 
@@ -321,47 +319,27 @@ now we are changing yes to 1 and no to 0. changing all binary to 0 1 and all cat
 
 ```{r}
   
-full_data_binary_subset = full_data %>% 
-  select(c(gender, citizen, smoked, drinker, heavy_drinker,overweight,gout, disease))
+full_data_binary_subset = full_data %>% dplyr::select(c(gender, citizen, smoked, drinker, heavy_drinker,overweight,gout, disease))
 
 full_data_non_binary = full_data %>%
-  select(-c(gender, citizen,smoked, drinker, heavy_drinker,overweight,gout, disease))
+  dplyr::select(-c(gender, citizen,smoked, drinker, heavy_drinker,overweight,gout, disease))
 
 full_data = cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .x))), full_data_non_binary) %>%
   mutate(marital = as.factor(marital),
          race = as.factor(race),
          income = as.factor(income),
          education = as.factor(education),
-         diabete = as.factor(diabete)) %>% 
-  mutate(disease = recode(disease, "0" = "neg", "1" = "pos")) %>% 
-  select(disease, everything())
+         diabete = as.factor(diabete))
 
-# write.csv(full_data, "data/full_data.csv", row.names = FALSE)
-```
-
-
-# data preprocessing
-
-```{r pre}
-
-# remove low variance predictors
-x_full =  model.matrix(disease~., full_data)[,-1]
-
-x = x_full[, -nearZeroVar(x_full)]   # 24 predictors
-
-# check collinarity 
-corrplot(cor(x))
-# high correlation in marital2 and citizen1, romove marital2
-x = x[, -8]               #  23 predictors
 
 ```
-
 
 #split training and test dataset
 
 
 ```{r}
 
+library(caret)
 set.seed(1)
 rowTrain <- createDataPartition(y = full_data$disease,
                                 p = 0.75,
@@ -370,6 +348,6 @@ rowTrain <- createDataPartition(y = full_data$disease,
 data_train = full_data[rowTrain,]
 data_test = full_data[-rowTrain,]
 
-x_train = x[rowTrain,]
-x_test = x[-rowTrain,]
+
 ```
+
