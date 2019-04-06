@@ -449,4 +449,21 @@ plot(roc.knn, legacy.axes = TRUE, print.auc = TRUE)
 ```
 
 
+# Model comparison
+
+```{r}
+# model selection based on cross-validation results
+res = resamples(list(NB = model.nb, KNN = model.knn))
+summary(res)
+```
+
+```{r}
+# evaluate the test set performance using ROC
+auc = c(roc.nb$auc[1], roc.knn$auc[1])
+plot(roc.nb, legacy.axes = TRUE)
+plot(roc.knn, col=2, add = TRUE)
+modelNames <- c("nb","knn")
+legend("bottomright", legend = paste0(modelNames, ": ", round(auc,3)),
+       col = 1:2, lwd = 2)
+```
 
