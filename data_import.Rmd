@@ -44,7 +44,9 @@ demographics_2014 = read_xpt("data/demographics_2014.XPT") %>%
   select(seqn, age = ridageyr, gender = riagendr, marital = dmdmartl, race = ridreth3, citizen = dmdcitzn, education = dmdeduc2)  %>% 
   filter(age > 20)
 
-demographics = bind_rows(demographics_2014, demographics_2015)
+demographics = bind_rows(demographics_2014, demographics_2015) %>% 
+  mutate(citizen = ifelse(citizen %in% c(1,2), citizen, NA),
+         marital = ifelse(citizen %in% c(1:6), citizen, NA))
 
 ```
 
@@ -336,6 +338,24 @@ full_data = cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .
 # write.csv(full_data, "data/full_data.csv", row.names = FALSE)
 ```
 
+
+# data preprocessing
+
+```{r pre}
+
+# remove low variance predictors
+x_full =  model.matrix(disease~., full_data)[,-1]
+
+x = x_full[, -nearZeroVar(x_full)]   # 24 predictors
+
+# check collinarity 
+corrplot(cor(x))
+# high correlation in marital2 and citizen1, romove marital2
+x = x[, -8]               #  23 predictors
+
+```
+
+
 #split training and test dataset
 
 
@@ -350,5 +370,6 @@ rowTrain <- createDataPartition(y = full_data$disease,
 data_train = full_data[rowTrain,]
 data_test = full_data[-rowTrain,]
 
-
+x_train = x[rowTrain,]
+x_test = x[-rowTrain]
 ```

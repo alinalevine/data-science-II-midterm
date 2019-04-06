@@ -49,7 +49,15 @@ model.lda <- train(x = data_train[, c(1, 3:9, 11:19)],
                    method = "lda",
                    metric = "ROC",
                    trControl = ctrl)
+data_train_res  = data_train %>% mutate(disease = recode(disease, "0" = "neg", "1" = "pos"))
+df = map_dfc(data_train %>% dplyr::select(-age, -depression_score, -fast, -ready, -forzen, -bmi), ~factor(.x)) %>% add_column(data_train %>% dplyr::select(age, depression_score, fast, ready, forzen, bmi))
+###########jiyue edit  this works#
+model2 =  train(x , y = data_train$disease,
+                   method = "lda",
+                   metric = "ROC",
+                   trControl = ctrl)
 
+################
 ```
 
 
