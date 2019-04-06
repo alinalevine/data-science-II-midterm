@@ -17,9 +17,35 @@ plot(lda.fit)
 
 ```{r}
 
-set.seed(1)
-model.lda <- train(x = dat[rowTrain,1:8],
-                   y = dat$diabetes[rowTrain],
+#levels can't start with number
+
+
+data_train = data_train %>%
+  mutate(diabete = make.names(diabete),
+         income = make.names(income),
+         education = make.names(education),
+         race = make.names(race),
+         marital = make.names(marital),
+         gout = make.names(gout),
+         overweight = make.names(overweight),
+         heavy_drinker = make.names(heavy_drinker),
+         drinker = make.names(drinker),
+         smoked = make.names(smoked),
+         citizen = make.names(citizen),
+         gender = make.names(gender),
+         disease = make.names(disease))
+
+ctrl <- trainControl(method = "repeatedcv",
+                     repeats = 5,
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE)
+
+data_train = data_train %>%
+  dplyr::select(disease,everything())
+
+  set.seed(1)
+model.lda <- train(x = data_train[, c(1, 3:9, 11:19)],
+                   y = data_train$disease,
                    method = "lda",
                    metric = "ROC",
                    trControl = ctrl)
