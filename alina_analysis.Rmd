@@ -6,6 +6,20 @@ output: html_document
 ---
 
 
+
+```{r}
+library(caret)
+library(glmnet)
+library(MASS)
+library(e1071)
+library(mlbench)
+library(pROC)
+library(AppliedPredictiveModeling)
+
+
+```
+
+
 #LDA
 
 ```{r}
@@ -32,9 +46,23 @@ model.lda <- train(x = x_train,
                    method = "lda",
                    metric = "ROC",
                    trControl = ctrl)
-predictions = predict(model.lda, newdata = x_test)
+predictions_lda = predict(model.lda, newdata = x_test)
 
-confusionMatrix(predictions, data_test$disease)
+
+confusionMatrix(predictions_lda, data_test$disease)
+
+
+###to make roc curve in MASS package
+
+library(MASS)
+
+lda.fit_mass = lda(disease~., data = as.data.frame(xy_train))
+lda.pred_mass <-predict(lda.fit_mass, newdata = as.data.frame(x_test))
+
+roc.lda =roc(data_test$disease, lda.pred_mass$posterior[,2],levels =c("neg", "pos"))
+
+plot(roc.lda, legacy.axes = TRUE, print.auc = TRUE)
+
 ```
 
 
@@ -47,6 +75,20 @@ model.qda <-train(x = x_train,
                   method = "qda",
                   metric = "ROC",
                   trControl = ctrl)
+
+predictions_qda = predict(model.qda, newdata = x_test)
+confusionMatrix(predictions_qda, data_test$disease)
+
+
+### with mass package to get ROC
+
+qda.fit_mass = qda(disease~., data = as.data.frame(xy_train))
+qda.pred_mass = predict(qda.fit_mass, newdata = as.data.frame(x_test))
+
+roc.qda = roc(data_test$disease, qda.pred_mass$posterior[,2],levels =c("neg", "pos"))
+
+plot(roc.qda, legacy.axes = TRUE, print.auc = TRUE)
+
 
 ```
 

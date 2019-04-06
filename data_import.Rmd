@@ -373,4 +373,10 @@ data_test = full_data[-rowTrain,]
 
 x_train = x[rowTrain,]
 x_test = x[-rowTrain,]
+
+xy_train = cbind(as.data.frame(x_train), data_train$disease) %>%
+  rename(disease = `data_train$disease`)
+xy_test = cbind(as.data.frame(x_test), data_test$disease) %>%
+  rename(disease = `data_test$disease`)
+
 ```
