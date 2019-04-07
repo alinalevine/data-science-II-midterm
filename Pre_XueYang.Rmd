@@ -533,6 +533,29 @@ res1 = resamples(list(NB1 = model.nb1, KNN1 = model.knn1))
 summary(res1)
 ```
 
+
+
+```{r}
+set.seed(1)
+model.glm <- train(x_train,
+                   y_train,
+                   method = "glm",
+                   metric = "ROC",
+                   trControl = ctrl)
+
+
+glmnGrid <- expand.grid(.alpha = seq(0, 1, length = 6),
+                        .lambda = exp(seq(-6, -2, length = 20)))
+set.seed(1)
+model.glmn <- train(x_train,
+                    y_train,
+                    method = "glmnet",
+                    tuneGrid = glmnGrid,
+                    metric = "ROC",
+                    trControl = ctrl)
+   
+```
+
 ```{r}
 # evaluate the test set performance using ROC
 auc = c(roc.nb$auc[1], roc.knn$auc[1])
