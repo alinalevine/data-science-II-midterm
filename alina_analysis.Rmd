@@ -26,6 +26,8 @@ library(AppliedPredictiveModeling)
 
 #levels can't start with number
 
+set.seed(2)
+
 ctrl <- trainControl(method = "repeatedcv",
                      repeats = 5,
                      summaryFunction = twoClassSummary,
@@ -40,11 +42,10 @@ data_test = data_test %>%
 
 
 
-  set.seed(1)
 model.lda <- train(x = x_train,
                    y = data_train$disease,
                    method = "lda",
-                   metric = "ROC",
+                   metric = "KAPPA",
                    trControl = ctrl)
 predictions_lda = predict(model.lda, newdata = x_test)
 
@@ -77,6 +78,8 @@ model.qda <-train(x = x_train,
                   trControl = ctrl)
 
 predictions_qda = predict(model.qda, newdata = x_test)
+
+
 confusionMatrix(predictions_qda, data_test$disease)
 
 
