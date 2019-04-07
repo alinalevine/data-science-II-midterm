@@ -45,7 +45,7 @@ data_test = data_test %>%
 model.lda <- train(x = x_train,
                    y = data_train$disease,
                    method = "lda",
-                   metric = "KAPPA",
+                   metric = "ROC",
                    trControl = ctrl)
 predictions_lda = predict(model.lda, newdata = x_test)
 
@@ -71,6 +71,8 @@ plot(roc.lda, legacy.axes = TRUE, print.auc = TRUE)
 
 ```{r}
 
+set.seed(2)
+
 model.qda <-train(x = x_train,
                   y = data_train$disease,
                   method = "qda",
@@ -91,8 +93,6 @@ qda.pred_mass = predict(qda.fit_mass, newdata = as.data.frame(x_test))
 roc.qda = roc(data_test$disease, qda.pred_mass$posterior[,2],levels =c("neg", "pos"))
 
 plot(roc.qda, legacy.axes = TRUE, print.auc = TRUE)
-
-
 ```
 
 

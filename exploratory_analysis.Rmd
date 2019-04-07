@@ -1,0 +1,51 @@
+---
+title: "alina_exploratory_analysis"
+author: "Alina Levine"
+date: "April 6, 2019"
+output: html_document
+---
+
+
+#density plots
+
+```{r}
+
+
+transparentTheme(trans = .4)
+featurePlot(x = x_train[, c(7,23)],
+            y = data_train$disease,
+            scales =list(x=list(relation="free"),
+                         y=list(relation="free")),
+            plot = "density", pch = "|",auto.key =list(columns = 2),
+            title = "Density Comparisons")
+
+
+
+```
+
+#get counts of cases and controls
+
+```{r}
+
+nrow(data_train %>% filter(disease == "pos"))
+nrow(data_train %>% filter(disease == "neg"))
+
+
+```
+
+#categorical
+
+```{r}
+
+summary = as.data.frame(xy_train) %>%
+  group_by(disease) %>%
+  summarize(total_diabetes = sum(diabete2)/length(diabete2),
+            total_male = sum(gender1)/length(gender1),
+            total_smoked = sum(smoked1)/length(smoked1),
+            total_heavy_drinker = sum(heavy_drinker1)/length(heavy_drinker1),
+            total_drinker = sum(drinker1)/length(drinker1))
+
+
+
+```
+
