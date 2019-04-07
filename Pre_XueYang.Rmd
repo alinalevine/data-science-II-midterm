@@ -394,9 +394,6 @@ ctrl <- trainControl(method = "repeatedcv",
                      summaryFunction = twoClassSummary,
                      classProbs = TRUE)
 
-set.seed(1)
-ctrl1 <- trainControl(method = "repeatedcv",
-                     repeats = 5)
 
 
 nbGrid <- expand.grid(usekernel = c(FALSE,TRUE), # false: Guassian density as density for each feature; true: non-parametric kernel estimate as density for each feature
@@ -412,23 +409,13 @@ model.nb <- train(x_train,
 
 plot(model.nb)
 
-model.nb$bestTune
-#    fL usekernel adjust
+model.nb$beswtTune
+tr#    fL usekernel adjust
 # 15  0      TRUE      2
 
 model.knn$results
 
-model.nb1 <- train(x_train,
-                  y_train,
-                  method = "nb",
-                  tuneGrid = nbGrid,
-                  trControl = ctrl1)
-plot(model.nb1)
-model.nb1$bestTune
-#    fL usekernel adjust
-# 15  0      TRUE      4
-
-model.nb1$results
+varImp(model.nb)
 ```
 
 Evaluate the test set performance using ROC:
@@ -446,7 +433,7 @@ mean(roc.nb$specificities)
 plot(roc.nb, legacy.axes = TRUE, print.auc = TRUE)
 
 nb.pred.test <- rep("neg", length(nb.pred))
-nb.pred.test[nb.pred>0.01] <- "pos"
+nb.pred.test[nb.pred>0.5] <- "pos"
 confusionMatrix(data = as.factor(nb.pred.test), reference = y_test)
 
 
@@ -481,19 +468,7 @@ print(model.knn)
 
 mean(model.knn$results$ROC)
 
-set.seed(1)
-model.knn1 <- train(x_train,
-                   y_train,
-                   method = "knn",
-                   preProcess = c("center","scale"), 
-                   tuneGrid = data.frame(k = seq(1,500,by=5)),
-                   trControl = ctrl1)
-ggplot(model.knn1)
-model.knn1$bestTune
-#k
-#100 496
-mean(model.knn1$results$Accuracy)
-mean(model.knn1$results$Kappa)
+varImp(model.knn)
 ```
 
 Evaluate the test set performance using ROC:
@@ -516,7 +491,7 @@ plot(roc.knn, legacy.axes = TRUE, print.auc = TRUE)
 # using 0.05 as cutoff
 knn.pred <- predict.train(model.knn, newdata = x_test, type = "prob")[,1]
 test.pred.knn <- rep("neg", length(knn.pred))
-test.pred.knn[knn.pred>0.05] <- "pos"
+test.pred.knn[knn.pred>0.1] <- "pos"
 confusionMatrix(data = as.factor(test.pred.knn), reference = y_test)
 
 ```
@@ -526,11 +501,13 @@ confusionMatrix(data = as.factor(test.pred.knn), reference = y_test)
 
 ```{r}
 # model selection based on cross-validation results
-res = resamples(list(NB = model.nb, KNN = model.knn))
+res = resamples(list(GLM = model.glm,GLMNET = model.glmn,
+                     LDA = model.lda, QDA = model.qda,
+                     NB = model.nb, KNN = model.knn))
 summary(res)
 
-res1 = resamples(list(NB1 = model.nb1, KNN1 = model.knn1))
-summary(res1)
+bwplot(res, metric = "ROC")
+
 ```
 
 
@@ -553,18 +530,56 @@ model.glmn <- train(x_train,
                     tuneGrid = glmnGrid,
                     metric = "ROC",
                     trControl = ctrl)
+
+
+glm.pred <- predict.train(model.glm, newdata = x_test, type = "prob")[,1]
+glmn.pred <- predict.train(model.glmn, newdata = x_test, type = "prob")[,1]
+
+roc.glm <- roc(y_test, glm.pred, levels = c("neg", "pos"))
+roc.glmn <- roc(y_test, glmn.pred, levels = c("neg", "pos"))
+
+roc.glm$auc
+roc.glmn$auc
+
+set.seed(1)
+model.lda <- train(x = x_train,
+                   y = y_train,
+                   method = "lda",
+                   metric = "ROC",
+                   trControl = ctrl)
+
+set.seed(1)
+model.qda <-train(x = x_train,
+                  y = y_train,
+                  method = "qda",
+                  metric = "ROC",
+                  trControl = ctrl)
+
+lda.pred <- predict.train(model.lda, newdata = x_test, type = "prob")[,1]
+qda.pred <- predict.train(model.qda, newdata = x_test, type = "prob")[,1]
+
+roc.lda <- roc(y_test, lda.pred, levels = c("neg", "pos"))
+roc.qda <- roc(y_test, qda.pred, levels = c("neg", "pos"))
+roc.lda$auc
+roc.qda$auc
    
 ```
 
 ```{r}
 # evaluate the test set performance using ROC
-auc = c(roc.nb$auc[1], roc.knn$auc[1])
-plot(roc.nb, legacy.axes = TRUE)
-plot(roc.knn, col=2, add = TRUE)
-modelNames <- c("nb","knn")
+auc = c(roc.glm$auc[1], roc.glmn$auc[1], roc.lda$auc[1], roc.qda$auc[1], roc.nb$auc[1], roc.knn$auc[1])
+plot(roc.glm, legacy.axes = TRUE)
+plot(roc.glmn, col = 2, add = TRUE)
+plot(roc.lda, col = 3, add = TRUE)
+plot(roc.qda, col = 4, add = TRUE)
+plot(roc.nb, col = 5, add = TRUE)
+modelNames <- c("glm","glmn","lda","qda","nb")
+
 legend("bottomright", legend = paste0(modelNames, ": ", round(auc,3)),
-       col = 1:2, lwd = 2)
+       col = 1:6, lwd = 2)
 ```
+
+
 
 
 
