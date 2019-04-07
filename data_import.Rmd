@@ -334,7 +334,8 @@ full_data = cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .
          income = as.factor(income),
          education = as.factor(education),
          diabete = as.factor(diabete)) %>% 
-  mutate(disease = recode(disease, "0" = "neg", "1" = "pos")) %>% 
+  mutate(disease = recode(disease, "0" = "neg", "1" = "pos"),
+         disease = relevel(disease, "pos")) %>% 
   select(disease, everything())
 
 # write.csv(full_data, "data/full_data.csv", row.names = FALSE)
