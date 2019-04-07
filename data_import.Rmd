@@ -24,7 +24,7 @@ Our targets are participants who are 20 years older.
 
 Age in years at screening: variable name RIDAGEYR
 Gender: variable name RIAGENDR
-Marital status: variable name DMDMARTL
+Marital status: variable name DMDMARTL(removed !!)
 Race/ethinicity: Race/Hispanic origin w/ NH Asian, variable name RIDRETH3
 Citizenship status: variable name DMDCITZN
 Education level: Education level - Adults 20+, variable name DMDEDUC2
@@ -38,17 +38,16 @@ https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Demographics
 ```{r demo}
 demographics_2015 = read_xpt("data/demographics.XPT") %>% 
   janitor::clean_names() %>%
-  select(seqn, age = ridageyr, gender = riagendr, marital = dmdmartl, race = ridreth3, citizen = dmdcitzn, education = dmdeduc2) %>% 
+  select(seqn, age = ridageyr, gender = riagendr, race = ridreth3, citizen = dmdcitzn, education = dmdeduc2) %>% 
   filter(age > 20)
 
 demographics_2014 = read_xpt("data/demographics_2014.XPT") %>% 
   janitor::clean_names() %>%
-  select(seqn, age = ridageyr, gender = riagendr, marital = dmdmartl, race = ridreth3, citizen = dmdcitzn, education = dmdeduc2)  %>% 
+  select(seqn, age = ridageyr, gender = riagendr, race = ridreth3, citizen = dmdcitzn, education = dmdeduc2)  %>% 
   filter(age > 20)
 
 demographics = bind_rows(demographics_2014, demographics_2015) %>% 
-  mutate(citizen = ifelse(citizen %in% c(1,2), citizen, NA),
-         marital = ifelse(citizen %in% c(1:6), citizen, NA))
+  mutate(citizen = ifelse(citizen %in% c(1,2), citizen, NA))
 
 ```
 
@@ -169,16 +168,16 @@ diet_behavior_2015 =
   select(seqn = SEQN, 
          fast = DBD900, 
          ready = DBD905, 
-         forzen = DBD910) %>% 
+         frozen = DBD910) %>% 
   filter(!fast %in% c(5555, 7777, 9999),
          !ready %in% c(6666, 7777, 9999),
-         !forzen %in% c(6666, 7777, 9999))
+         !frozen %in% c(6666, 7777, 9999))
 
 
 # proportion of missing value
 sum(is.na(diet_behavior_2015$fast))/length(diet_behavior_2015$seqn)
 sum(is.na(diet_behavior_2015$ready))/length(diet_behavior_2015$seqn)
-sum(is.na(diet_behavior_2015$forzen))/length(diet_behavior_2015$seqn)
+sum(is.na(diet_behavior_2015$frozen))/length(diet_behavior_2015$seqn)
 ```
 
 ```{r}
@@ -188,10 +187,10 @@ diet_behavior_2014 =
   select(seqn = SEQN, 
          fast = DBD900, 
          ready = DBD905, 
-         forzen = DBD910) %>% 
+         frozen = DBD910) %>% 
   filter(!fast %in% c(5555, 7777, 9999),
          !ready %in% c(6666, 7777, 9999),
-         !forzen %in% c(6666, 7777, 9999))
+         !frozen %in% c(6666, 7777, 9999))
 
 
 diet_behavior = rbind(diet_behavior_2014, diet_behavior_2015)
@@ -199,7 +198,7 @@ diet_behavior = rbind(diet_behavior_2014, diet_behavior_2015)
 # proportion of missing value
 sum(is.na(diet_behavior$fast))/length(diet_behavior$seqn)
 sum(is.na(diet_behavior$ready))/length(diet_behavior$seqn)
-sum(is.na(diet_behavior$forzen))/length(diet_behavior$seqn)
+sum(is.na(diet_behavior$frozen))/length(diet_behavior$seqn)
 ```
 
 
@@ -299,8 +298,6 @@ sum(is.na(coronary$disease))/length(coronary$seqn)
 
 
 
-#variables we might need to remove: fast food, heavy drinker(but this is important one)
-
 
 
 ```{r}
@@ -329,8 +326,7 @@ full_data_non_binary = full_data %>%
   select(-c(gender, citizen,smoked, drinker, heavy_drinker,overweight,gout, disease))
 
 full_data = cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .x))), full_data_non_binary) %>%
-  mutate(marital = as.factor(marital),
-         race = as.factor(race),
+  mutate(race = as.factor(race),
          income = as.factor(income),
          education = as.factor(education),
          diabete = as.factor(diabete)) %>% 
@@ -340,7 +336,7 @@ full_data = cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .
 
 # write.csv(full_data, "data/full_data.csv", row.names = FALSE)
 ```
-
+full_data has 17 predictors.
 
 # data preprocessing
 
@@ -349,12 +345,14 @@ full_data = cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .
 # remove low variance predictors
 x_full =  model.matrix(disease~., full_data)[,-1]
 
-x = x_full[, -nearZeroVar(x_full)]   # 24 predictors
+x = x_full[, -nearZeroVar(x_full)]   # 23 predictors: remove gout1 race7 diabete3
 
 # check collinarity 
-corrplot(cor(x))
-# high correlation in marital2 and citizen1, romove marital2
-x = x[, -8]               #  23 predictors
+cor(x) %>% 
+  corrplot(method = "square", tl.col="black", tl.srt=45, insig = "blank", 
+         # hide correlation coefficient on the principal diagonal
+         diag=FALSE, number.cex = .7)
+# looks ok
 
 ```
 
