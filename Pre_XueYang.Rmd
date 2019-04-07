@@ -362,6 +362,15 @@ rowTrain <- createDataPartition(y = full_data$disease,
 data_train = full_data[rowTrain,]
 data_test = full_data[-rowTrain,]
 
+data_train = 
+  data_train %>%
+  mutate(disease = relevel(disease, "pos"))
+
+data_test = 
+  data_test %>%
+  mutate(disease = relevel(disease, "pos"))
+
+
 x_train = x[rowTrain,]
 x_test = x[-rowTrain,]
 
@@ -385,6 +394,11 @@ ctrl <- trainControl(method = "repeatedcv",
                      summaryFunction = twoClassSummary,
                      classProbs = TRUE)
 
+set.seed(1)
+ctrl1 <- trainControl(method = "repeatedcv",
+                     repeats = 5)
+
+
 nbGrid <- expand.grid(usekernel = c(FALSE,TRUE), # false: Guassian density as density for each feature; true: non-parametric kernel estimate as density for each feature
                       fL = 0:1, # laplace correction: correction of 0 density case
                       adjust = seq(0,5,by = 1)) # specify the bandwidth
@@ -397,15 +411,30 @@ model.nb <- train(x_train,
                   trControl = ctrl)
 
 plot(model.nb)
+
 model.nb$bestTune
 #    fL usekernel adjust
 # 15  0      TRUE      2
+
+model.knn$results
+
+model.nb1 <- train(x_train,
+                  y_train,
+                  method = "nb",
+                  tuneGrid = nbGrid,
+                  trControl = ctrl1)
+plot(model.nb1)
+model.nb1$bestTune
+#    fL usekernel adjust
+# 15  0      TRUE      4
+
+model.nb1$results
 ```
 
 Evaluate the test set performance using ROC:
 
 ```{r, warning=FALSE}
-nb.pred <- predict(model.nb, newdata = x_test, type = "prob")[,2]
+nb.pred <- predict(model.nb, newdata = x_test, type = "prob")[,1]
 
 roc.nb <- roc(y_test, nb.pred, levels = c("neg", "pos"))
 roc.nb$auc 
@@ -415,6 +444,15 @@ mean(roc.nb$sensitivities)
 mean(roc.nb$specificities)
 # [1] 0.5130937
 plot(roc.nb, legacy.axes = TRUE, print.auc = TRUE)
+
+nb.pred.test <- rep("neg", length(nb.pred))
+nb.pred.test[nb.pred>0.01] <- "pos"
+confusionMatrix(data = as.factor(nb.pred.test), reference = y_test)
+
+
+
+
+
 ```
 
 
@@ -438,6 +476,24 @@ ggplot(model.knn)
 model.knn$bestTune
 #  k
 # 85 421
+print(model.knn)
+
+
+mean(model.knn$results$ROC)
+
+set.seed(1)
+model.knn1 <- train(x_train,
+                   y_train,
+                   method = "knn",
+                   preProcess = c("center","scale"), 
+                   tuneGrid = data.frame(k = seq(1,500,by=5)),
+                   trControl = ctrl1)
+ggplot(model.knn1)
+model.knn1$bestTune
+#k
+#100 496
+mean(model.knn1$results$Accuracy)
+mean(model.knn1$results$Kappa)
 ```
 
 Evaluate the test set performance using ROC:
@@ -445,8 +501,10 @@ Evaluate the test set performance using ROC:
 #trans = preProcess(x_train, method = c("center","scale"))
 #knn.pred <- predict(model.knn$finalModel, newdata = predict(trans,x_test), type = "prob")[,2]
 
-knn.pred <- predict.train(model.knn, newdata = x_test, type = "prob")[,2]
+knn.pred <- predict.train(model.knn, newdata = x_test, type = "prob")[,1]
 roc.knn <- roc(y_test, knn.pred, levels = c("neg", "pos"))
+plot(roc.knn, legacy.axes = TRUE, print.auc = TRUE)
+
 roc.knn$auc
 # Area under the curve: 0.8637
 mean(roc.knn$sensitivities)
@@ -454,6 +512,13 @@ mean(roc.knn$sensitivities)
 mean(roc.knn$specificities)
 # [1] 0.6757431
 plot(roc.knn, legacy.axes = TRUE, print.auc = TRUE)
+
+# using 0.05 as cutoff
+knn.pred <- predict.train(model.knn, newdata = x_test, type = "prob")[,1]
+test.pred.knn <- rep("neg", length(knn.pred))
+test.pred.knn[knn.pred>0.05] <- "pos"
+confusionMatrix(data = as.factor(test.pred.knn), reference = y_test)
+
 ```
 
 
@@ -463,6 +528,9 @@ plot(roc.knn, legacy.axes = TRUE, print.auc = TRUE)
 # model selection based on cross-validation results
 res = resamples(list(NB = model.nb, KNN = model.knn))
 summary(res)
+
+res1 = resamples(list(NB1 = model.nb1, KNN1 = model.knn1))
+summary(res1)
 ```
 
 ```{r}
@@ -474,5 +542,7 @@ modelNames <- c("nb","knn")
 legend("bottomright", legend = paste0(modelNames, ": ", round(auc,3)),
        col = 1:2, lwd = 2)
 ```
+
+
 
 
