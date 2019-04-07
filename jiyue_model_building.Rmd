@@ -1,0 +1,64 @@
+---
+title: "predictor selecion"
+author: "JiyueQin"
+date: "April 5, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(caret)
+library(corrplot)
+library(AppliedPredictiveModeling)
+transparentTheme(trans = .4)
+library(pROC)
+```
+
+
+# logistic
+
+```{r logistic}
+ctrl <- trainControl(method = "repeatedcv",
+                     repeats = 5,
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE)
+
+set.seed(1)
+model.glm <- train(x_train,
+                   y = data_train$disease,
+                   method = "glm",
+                   metric = "ROC",
+                   trControl = ctrl)
+# fit = glm(disease~., data = data_train, family = binomial)
+# won't give warning about collinarity
+```
+
+
+# regularized logistic
+
+```{r regu}
+glmnGrid <- expand.grid(.alpha = seq(0, 1, length = 6),
+                        .lambda = exp(seq(-6, -2, length = 20)))
+set.seed(1)
+model.glmn <- train(x_train,
+                    y = data_train$disease,
+                    method = "glmnet",
+                    tuneGrid = glmnGrid,
+                    metric = "ROC",
+                    trControl = ctrl)
+plot(model.glmn, xTrans = function(x) log(x))   
+```
+
+# test performance 
+```{r test}
+glm.pred <- predict(model.glm, newdata = xy_train, type = "prob")[,2]
+glmn.pred <- predict(model.glmn, newdata = xy_train, type = "prob")[,2]
+
+roc.glm <- roc(data_train$disease, glm.pred)
+roc.glmn <- roc(data_train$disease, glmn.pred)
+## look at sen and sel
+test.glm.pred <- rep("neg", length(glm.pred))
+test.glm.pred[glm.pred>0.1] <- "pos"
+confusionMatrix(factor(test.glm.pred), data_train$disease, positive = "pos")
+
+```

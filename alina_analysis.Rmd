@@ -6,11 +6,26 @@ output: html_document
 ---
 
 
+
+```{r}
+library(caret)
+library(glmnet)
+library(e1071)
+library(mlbench)
+library(pROC)
+library(AppliedPredictiveModeling)
+
+
+```
+
+
 #LDA
 
 ```{r}
 
 #levels can't start with number
+
+set.seed(2)
 
 ctrl <- trainControl(method = "repeatedcv",
                      repeats = 5,
@@ -26,15 +41,36 @@ data_test = data_test %>%
 
 
 
-  set.seed(1)
 model.lda <- train(x = x_train,
                    y = data_train$disease,
                    method = "lda",
                    metric = "ROC",
                    trControl = ctrl)
-predictions = predict(model.lda, newdata = x_test)
+predictions_lda = predict(model.lda, newdata = x_test)
 
-confusionMatrix(predictions, data_test$disease)
+
+confusionMatrix(predictions_lda, data_test$disease)
+
+
+
+```
+
+
+#LDA cutoff >.1
+
+```{r}
+lda.pred = predict.train(model.lda, newdata = x_test, type = "prob")[,1]
+test.pred.lda.1 = rep("neg", length(lda.pred))
+test.pred.lda.1[lda.pred>.1] = "pos"
+confusionMatrix(data = relevel(as.factor(test.pred.lda.1), "neg"), reference = data_test$disease, positive = "pos")
+
+
+roc.lda =roc(data_test$disease, lda.pred,levels =c("neg", "pos"))
+
+plot(roc.lda, legacy.axes = TRUE, print.auc = TRUE)
+
+
+
 ```
 
 
@@ -42,13 +78,44 @@ confusionMatrix(predictions, data_test$disease)
 
 ```{r}
 
+set.seed(2)
+
 model.qda <-train(x = x_train,
                   y = data_train$disease,
                   method = "qda",
                   metric = "ROC",
                   trControl = ctrl)
 
+predictions_qda = predict(model.qda, newdata = x_test)
+
+
+confusionMatrix(predictions_qda, data_test$disease)
+
 ```
+
+
+#QDA cutoff >.1
+
+```{r}
+#LDA cutoff >.1
+
+qda.pred = predict.train(model.qda, newdata = x_test, type = "prob")[,1]
+test.pred.qda.1 = rep("neg", length(qda.pred))
+test.pred.qda.1[qda.pred>.1] = "pos"
+confusionMatrix(data = relevel(as.factor(test.pred.qda.1), "neg"), reference = data_test$disease, positive = "pos")
+
+
+roc.lda =roc(data_test$disease, lda.pred,levels =c("neg", "pos"))
+
+plot(roc.lda, legacy.axes = TRUE, print.auc = TRUE)
+
+
+```
+
+
+
+```
+
 
 
 
