@@ -11,6 +11,7 @@ library(caret)
 library(corrplot)
 library(AppliedPredictiveModeling)
 transparentTheme(trans = .4)
+library(pROC)
 ```
 
 
@@ -48,3 +49,16 @@ model.glmn <- train(x_train,
 plot(model.glmn, xTrans = function(x) log(x))   
 ```
 
+# test performance 
+```{r test}
+glm.pred <- predict(model.glm, newdata = xy_train, type = "prob")[,2]
+glmn.pred <- predict(model.glmn, newdata = xy_train, type = "prob")[,2]
+
+roc.glm <- roc(data_train$disease, glm.pred)
+roc.glmn <- roc(data_train$disease, glmn.pred)
+## look at sen and sel
+test.glm.pred <- rep("neg", length(glm.pred))
+test.glm.pred[glm.pred>0.1] <- "pos"
+confusionMatrix(factor(test.glm.pred), data_train$disease, positive = "pos")
+
+```
