@@ -396,7 +396,7 @@ model.nb <- train(x_train,
                   metric = "ROC",
                   trControl = ctrl)
 
-plot(model.nb)`
+plot(model.nb)
 model.nb$bestTune
 #    fL usekernel adjust
 # 15  0      TRUE      2
