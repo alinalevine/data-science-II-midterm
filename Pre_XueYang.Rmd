@@ -459,7 +459,7 @@ model.knn <- train(x_train,
                    tuneGrid = data.frame(k = seq(1,500,by=5)),
                    trControl = ctrl)
 dev.off()
-ggplot(model.knn)
+plot(model.knn)
 model.knn$bestTune
 #  k
 # 85 421
@@ -573,13 +573,26 @@ plot(roc.glmn, col = 2, add = TRUE)
 plot(roc.lda, col = 3, add = TRUE)
 plot(roc.qda, col = 4, add = TRUE)
 plot(roc.nb, col = 5, add = TRUE)
-modelNames <- c("glm","glmn","lda","qda","nb")
+plot(roc.knn, col = 6, add = TRUE)
+modelNames <- c("glm","glmn","lda","qda","nb", "knn")
 
 legend("bottomright", legend = paste0(modelNames, ": ", round(auc,3)),
        col = 1:6, lwd = 2)
 ```
 
 
+```{r}
+# important predictor
+
+varImp(model.glm, scale = FALSE)
+varImp(model.glmn, scale = FALSE)
+varImp(model.lda, scale = FALSE)
+varImp(model.qda, scale = FALSE)
+varImp(model.nb, scale = FALSE)
+varImp(model.knn, scale = FALSE)
+
+plot(varImp(model.knn, scale = FALSE))
+```
 
 
 
