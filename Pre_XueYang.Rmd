@@ -320,18 +320,19 @@ full_data_binary_subset = full_data %>%
 full_data_non_binary = full_data %>%
   select(-c(gender, citizen,smoked, drinker, heavy_drinker,overweight,gout, disease))
 
-full_data = cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .x))), full_data_non_binary) %>%
-  mutate(marital = as.factor(marital),
-         race = as.factor(race),
+full_data = cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .x))), full_data_non_binary)%>%
+  mutate(race = as.factor(race),
          income = as.factor(income),
          education = as.factor(education),
          diabete = as.factor(diabete)) %>% 
-  mutate(disease = recode(disease, "0" = "neg", "1" = "pos")) %>% 
+  mutate(disease = recode(disease, "0" = "neg", "1" = "pos"),
+         disease = relevel(disease, "pos")) %>% 
   select(disease, everything())
 
 # write.csv(full_data, "data/full_data.csv", row.names = FALSE)
 ```
 
+full_data has 17 predictors.
 
 # data preprocessing
 
@@ -340,13 +341,14 @@ full_data = cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .
 # remove low variance predictors
 x_full =  model.matrix(disease~., full_data)[,-1]
 
-x = x_full[, -nearZeroVar(x_full)]   # 24 predictors, remove gout1, race7, diabite3
+x = x_full[, -nearZeroVar(x_full)]   # 23 predictors: remove gout1 race7 diabete3
 
 # check collinarity 
-corrplot(cor(x))
-# high correlation in marital2 and citizen1, romove marital2
-x = x[, -8]               #  23 predictors
-
+cor(x) %>% 
+  corrplot(method = "square", tl.col="black", tl.srt=45, insig = "blank", 
+         # hide correlation coefficient on the principal diagonal
+         diag=FALSE, number.cex = .7)
+# looks ok
 ```
 
 
@@ -361,6 +363,15 @@ rowTrain <- createDataPartition(y = full_data$disease,
 
 data_train = full_data[rowTrain,]
 data_test = full_data[-rowTrain,]
+
+data_train = 
+  data_train %>%
+  mutate(disease = relevel(disease, "pos"))
+
+data_test = 
+  data_test %>%
+  mutate(disease = relevel(disease, "pos"))
+
 
 x_train = x[rowTrain,]
 x_test = x[-rowTrain,]
@@ -385,6 +396,8 @@ ctrl <- trainControl(method = "repeatedcv",
                      summaryFunction = twoClassSummary,
                      classProbs = TRUE)
 
+
+
 nbGrid <- expand.grid(usekernel = c(FALSE,TRUE), # false: Guassian density as density for each feature; true: non-parametric kernel estimate as density for each feature
                       fL = 0:1, # laplace correction: correction of 0 density case
                       adjust = seq(0,5,by = 1)) # specify the bandwidth
@@ -397,15 +410,20 @@ model.nb <- train(x_train,
                   trControl = ctrl)
 
 plot(model.nb)
-model.nb$bestTune
-#    fL usekernel adjust
+
+model.nb$beswtTune
+tr#    fL usekernel adjust
 # 15  0      TRUE      2
+
+model.knn$results
+
+varImp(model.nb)
 ```
 
 Evaluate the test set performance using ROC:
 
 ```{r, warning=FALSE}
-nb.pred <- predict(model.nb, newdata = x_test, type = "prob")[,2]
+nb.pred <- predict(model.nb, newdata = x_test, type = "prob")[,1]
 
 roc.nb <- roc(y_test, nb.pred, levels = c("neg", "pos"))
 roc.nb$auc 
@@ -415,6 +433,15 @@ mean(roc.nb$sensitivities)
 mean(roc.nb$specificities)
 # [1] 0.5130937
 plot(roc.nb, legacy.axes = TRUE, print.auc = TRUE)
+
+nb.pred.test <- rep("neg", length(nb.pred))
+nb.pred.test[nb.pred>0.5] <- "pos"
+confusionMatrix(data = as.factor(nb.pred.test), reference = y_test)
+
+
+
+
+
 ```
 
 
@@ -434,10 +461,16 @@ model.knn <- train(x_train,
                    tuneGrid = data.frame(k = seq(1,500,by=5)),
                    trControl = ctrl)
 dev.off()
-ggplot(model.knn)
+plot(model.knn)
 model.knn$bestTune
 #  k
 # 85 421
+print(model.knn)
+
+
+mean(model.knn$results$ROC)
+
+varImp(model.knn)
 ```
 
 Evaluate the test set performance using ROC:
@@ -445,8 +478,10 @@ Evaluate the test set performance using ROC:
 #trans = preProcess(x_train, method = c("center","scale"))
 #knn.pred <- predict(model.knn$finalModel, newdata = predict(trans,x_test), type = "prob")[,2]
 
-knn.pred <- predict.train(model.knn, newdata = x_test, type = "prob")[,2]
+knn.pred <- predict.train(model.knn, newdata = x_test, type = "prob")[,1]
 roc.knn <- roc(y_test, knn.pred, levels = c("neg", "pos"))
+plot(roc.knn, legacy.axes = TRUE, print.auc = TRUE)
+
 roc.knn$auc
 # Area under the curve: 0.8637
 mean(roc.knn$sensitivities)
@@ -454,6 +489,13 @@ mean(roc.knn$sensitivities)
 mean(roc.knn$specificities)
 # [1] 0.6757431
 plot(roc.knn, legacy.axes = TRUE, print.auc = TRUE)
+
+# using 0.05 as cutoff
+knn.pred <- predict.train(model.knn, newdata = x_test, type = "prob")[,1]
+test.pred.knn <- rep("neg", length(knn.pred))
+test.pred.knn[knn.pred>0.1] <- "pos"
+confusionMatrix(data = as.factor(test.pred.knn), reference = y_test)
+
 ```
 
 
@@ -461,18 +503,99 @@ plot(roc.knn, legacy.axes = TRUE, print.auc = TRUE)
 
 ```{r}
 # model selection based on cross-validation results
-res = resamples(list(NB = model.nb, KNN = model.knn))
+res = resamples(list(GLM = model.glm,GLMNET = model.glmn,
+                     LDA = model.lda, QDA = model.qda,
+                     NB = model.nb, KNN = model.knn))
 summary(res)
+
+bwplot(res, metric = "ROC")
+
+```
+
+
+
+```{r}
+set.seed(1)
+model.glm <- train(x_train,
+                   y_train,
+                   method = "glm",
+                   metric = "ROC",
+                   trControl = ctrl)
+
+
+glmnGrid <- expand.grid(.alpha = seq(0, 1, length = 6),
+                        .lambda = exp(seq(-6, -2, length = 20)))
+set.seed(1)
+model.glmn <- train(x_train,
+                    y_train,
+                    method = "glmnet",
+                    tuneGrid = glmnGrid,
+                    metric = "ROC",
+                    trControl = ctrl)
+
+
+glm.pred <- predict.train(model.glm, newdata = x_test, type = "prob")[,1]
+glmn.pred <- predict.train(model.glmn, newdata = x_test, type = "prob")[,1]
+
+roc.glm <- roc(y_test, glm.pred, levels = c("neg", "pos"))
+roc.glmn <- roc(y_test, glmn.pred, levels = c("neg", "pos"))
+
+roc.glm$auc
+roc.glmn$auc
+
+set.seed(1)
+model.lda <- train(x = x_train,
+                   y = y_train,
+                   method = "lda",
+                   metric = "ROC",
+                   trControl = ctrl)
+
+set.seed(1)
+model.qda <-train(x = x_train,
+                  y = y_train,
+                  method = "qda",
+                  metric = "ROC",
+                  trControl = ctrl)
+
+lda.pred <- predict.train(model.lda, newdata = x_test, type = "prob")[,1]
+qda.pred <- predict.train(model.qda, newdata = x_test, type = "prob")[,1]
+
+roc.lda <- roc(y_test, lda.pred, levels = c("neg", "pos"))
+roc.qda <- roc(y_test, qda.pred, levels = c("neg", "pos"))
+roc.lda$auc
+roc.qda$auc
+   
 ```
 
 ```{r}
 # evaluate the test set performance using ROC
-auc = c(roc.nb$auc[1], roc.knn$auc[1])
-plot(roc.nb, legacy.axes = TRUE)
-plot(roc.knn, col=2, add = TRUE)
-modelNames <- c("nb","knn")
+auc = c(roc.glm$auc[1], roc.glmn$auc[1], roc.lda$auc[1], roc.qda$auc[1], roc.nb$auc[1], roc.knn$auc[1])
+plot(roc.glm, legacy.axes = TRUE)
+plot(roc.glmn, col = 2, add = TRUE)
+plot(roc.lda, col = 3, add = TRUE)
+plot(roc.qda, col = 4, add = TRUE)
+plot(roc.nb, col = 5, add = TRUE)
+plot(roc.knn, col = 6, add = TRUE)
+modelNames <- c("glm","glmn","lda","qda","nb", "knn")
+
 legend("bottomright", legend = paste0(modelNames, ": ", round(auc,3)),
-       col = 1:2, lwd = 2)
+       col = 1:6, lwd = 2)
 ```
+
+
+```{r}
+# important predictor
+
+varImp(model.glm, scale = FALSE)
+varImp(model.glmn, scale = FALSE)
+varImp(model.lda, scale = FALSE)
+varImp(model.qda, scale = FALSE)
+varImp(model.nb, scale = FALSE)
+varImp(model.knn, scale = FALSE)
+
+plot(varImp(model.knn, scale = FALSE))
+```
+
+
 
 

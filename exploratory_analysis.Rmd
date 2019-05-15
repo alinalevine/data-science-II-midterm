@@ -39,13 +39,24 @@ nrow(data_train %>% filter(disease == "neg"))
 
 summary = as.data.frame(xy_train) %>%
   group_by(disease) %>%
-  summarize(total_diabetes = sum(diabete2)/length(diabete2),
+  summarize(total_diabetes = sum(diabete2)/length(diabete2),  # wrong 
             total_male = sum(gender1)/length(gender1),
             total_smoked = sum(smoked1)/length(smoked1),
             total_heavy_drinker = sum(heavy_drinker1)/length(heavy_drinker1),
             total_drinker = sum(drinker1)/length(drinker1))
 
+<<<<<<< HEAD
 
 write.csv(summary, "summary.csv")
+=======
+summary = data_train %>%
+  group_by(disease) %>%
+  summarize(total_diabetes = sum(diabete == "1")/n(),
+            total_male = sum(gender == "1")/n(),
+            total_smoked = sum(smoked == "1")/n(),
+            total_heavy_drinker = sum(heavy_drinker == "1")/n(),
+            total_drinker = sum(drinker == "1")/n())
+
+>>>>>>> f3a6713d48ba59989a1174a2b23684233d63258e
 ```
 

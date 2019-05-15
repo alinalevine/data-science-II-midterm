@@ -18,6 +18,15 @@ library(pROC)
 # logistic
 
 ```{r logistic}
+
+transparentTheme(trans = .4)
+featurePlot(x = x_train[,c(7,22,23)], 
+            y = data_train$disease,
+            scales = list(x=list(relation="free"), 
+                        y=list(relation="free")),
+            plot = "density", pch = "|", 
+            auto.key = list(columns = 2))
+
 ctrl <- trainControl(method = "repeatedcv",
                      repeats = 5,
                      summaryFunction = twoClassSummary,
@@ -29,6 +38,7 @@ model.glm <- train(x_train,
                    method = "glm",
                    metric = "ROC",
                    trControl = ctrl)
+varImp(model.glm, scale = F)
 # fit = glm(disease~., data = data_train, family = binomial)
 # won't give warning about collinarity
 ```
@@ -48,17 +58,26 @@ model.glmn <- train(x_train,
                     trControl = ctrl)
 plot(model.glmn, xTrans = function(x) log(x))   
 ```
+# cv resample
 
+```{r resample}
+res <- resamples(list(GLM = model.glm, GLMNET = model.glmn))
+summary(res)
+bwplot(res, metric = "ROC")
+```
 # test performance 
 ```{r test}
-glm.pred <- predict(model.glm, newdata = xy_train, type = "prob")[,2]
-glmn.pred <- predict(model.glmn, newdata = xy_train, type = "prob")[,2]
+glm.pred <- predict(model.glm, newdata = xy_test, type = "prob")[,2]
+glmn.pred <- predict(model.glmn, newdata = xy_test, type = "prob")[,2]
 
-roc.glm <- roc(data_train$disease, glm.pred)
-roc.glmn <- roc(data_train$disease, glmn.pred)
-## look at sen and sel
+roc.glm <- roc(data_test$disease, glm.pred)
+roc.glmn <- roc(data_test$disease, glmn.pred)
+## look at sen and specificity
 test.glm.pred <- rep("neg", length(glm.pred))
 test.glm.pred[glm.pred>0.1] <- "pos"
 confusionMatrix(factor(test.glm.pred), data_train$disease, positive = "pos")
+
+plot(roc.glm, legacy.axes = TRUE, print.auc = TRUE)
+plot(roc.glmn, col = 2, add = TRUE)
 
 ```
