@@ -320,18 +320,19 @@ full_data_binary_subset = full_data %>%
 full_data_non_binary = full_data %>%
   select(-c(gender, citizen,smoked, drinker, heavy_drinker,overweight,gout, disease))
 
-full_data = cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .x))), full_data_non_binary) %>%
-  mutate(marital = as.factor(marital),
-         race = as.factor(race),
+full_data = cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .x))), full_data_non_binary)%>%
+  mutate(race = as.factor(race),
          income = as.factor(income),
          education = as.factor(education),
          diabete = as.factor(diabete)) %>% 
-  mutate(disease = recode(disease, "0" = "neg", "1" = "pos")) %>% 
+  mutate(disease = recode(disease, "0" = "neg", "1" = "pos"),
+         disease = relevel(disease, "pos")) %>% 
   select(disease, everything())
 
 # write.csv(full_data, "data/full_data.csv", row.names = FALSE)
 ```
 
+full_data has 17 predictors.
 
 # data preprocessing
 
@@ -340,13 +341,14 @@ full_data = cbind(map_dfc(full_data_binary_subset, ~as.factor(ifelse(.x==2, 0, .
 # remove low variance predictors
 x_full =  model.matrix(disease~., full_data)[,-1]
 
-x = x_full[, -nearZeroVar(x_full)]   # 24 predictors, remove gout1, race7, diabite3
+x = x_full[, -nearZeroVar(x_full)]   # 23 predictors: remove gout1 race7 diabete3
 
 # check collinarity 
-corrplot(cor(x))
-# high correlation in marital2 and citizen1, romove marital2
-x = x[, -8]               #  23 predictors
-
+cor(x) %>% 
+  corrplot(method = "square", tl.col="black", tl.srt=45, insig = "blank", 
+         # hide correlation coefficient on the principal diagonal
+         diag=FALSE, number.cex = .7)
+# looks ok
 ```
 
 
