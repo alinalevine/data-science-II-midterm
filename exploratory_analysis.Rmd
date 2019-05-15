@@ -46,6 +46,6 @@ summary = as.data.frame(xy_train) %>%
             total_drinker = sum(drinker1)/length(drinker1))
 
 
-
+write.csv(summary, "summary.csv")
 ```
 
