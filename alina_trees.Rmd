@@ -69,6 +69,18 @@ saveRDS(tree_kappa, "tree_kappa.RDS")
 
 #15 terminal nodes, just like ROC tuning
 
+#tree undersample
+
+
+set.seed(1)
+tree_kappa_undersample <- train(under_x_train, under_y_train, 
+                   method = "rpart",
+                   tuneGrid = data.frame(cp = exp(seq(-15,-4, len = 200))),
+                   trControl = ctrl_ac_kap,
+                   metric = "Kappa")
+
+saveRDS(tree_kappa_undersample, "tree_kappa_undersample.rds")
+
 ```
 
 
@@ -103,10 +115,10 @@ saveRDS(tree_kappa_thresholds, "tree_kappa_thresholds.rds")
 
 ```{r}
 
-pred_tree_prob = predict(tree, newdata = data_test[, ,2:18], type = "prob")
+pred_tree_prob = predict(tree_kappa_thresholds, newdata = data_test[2:18], type = "prob")
 
-pred_tree<- rep("pos", nrow(as.data.frame(pred_tree_prob)))
-pred_tree[as.data.frame(pred_tree_prob)$neg>0.5] = "neg"
+pred_tree<- rep("neg", nrow(as.data.frame(pred_tree_prob)))
+pred_tree[as.data.frame(pred_tree_prob)$pos>.1] = "pos"
 
 
 confusionMatrix(data = relevel(as.factor(pred_tree), ref = "pos"),
@@ -121,6 +133,10 @@ plot(roc.tree_test, legacy.axes = TRUE, print.auc = TRUE)
 
 ```
 
+#for cutoff of .1: test Kappa is .237
+
+
+#roc
 
 Accuracy = .9551
 Kappa = .1323
@@ -205,14 +221,14 @@ saveRDS(rf.fit_Kappa, "rf.fit_Kappa.RDS")
 ###random forest using kappa and threshold probability cv
 
 ```{r}
-
+set.seed(1)
 ctrl3 <- trainControl(method = "cv", classProbs = TRUE, savePredictions = "all")
 
 rf.grid <- expand.grid(mtry = 1:14,
                        splitrule = "gini",
                        min.node.size = 1:10)
 set.seed(1)
-rf.fit_Kappa_threshold <- train(disease~., data_train, 
+rf.fit_Kappa_threshold <- train(x_train, data_train$disease, 
                 method = "ranger",
                 tuneGrid = rf.grid,
                 metric = "Kappa",
@@ -225,7 +241,23 @@ resample_stats_rf <- thresholder(rf.fit_Kappa_threshold,
                               final = TRUE)
 
 saveRDS(resample_stats_rf, "resample_stats_rf.rds")
+
+rf.fit_Kappa_threshold = readRDS("rf.fit_Kappa_threshold")
+
 ```
+
+
+
+rf test using kappa
+
+```{r}
+
+```
+
+
+
+
+
 
 ##random forest test set performance using roc
 
@@ -518,11 +550,43 @@ rf.fit_undersample$bestTune
 
 
 
+test undersampling
+
+
+```{r}
+
+
+
+pred_boost_under_prob = predict(gbmB.fit_kappa_undersample, newdata = under_data_test[,2:18], type = "prob")
+
+pred_boost_kap<- rep("pos", nrow(as.data.frame(pred_boost_kap_prob)))
+
+pred_boost_kap[as.data.frame(pred_boost_kap_prob)$neg>0.5] = "neg"
+
+
+confusionMatrix(data = relevel(as.factor(pred_boost_kap), ref = "pos"),
+                reference = data_test[,1],
+                positive = "pos")
+
+
+
+
+```
+
 
 
 ```{r}
 
 library(modelr) 
+
+```
+
+
+Testing ROc objects
+
+```{r}
+model.tree.rds = readRDS("model.tree.rds")
+
 
 ```
 
