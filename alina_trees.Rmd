@@ -160,7 +160,7 @@ rf.fit$bestTune
 
 ```{r}
 
-rf.grid <- expand.grid(mtry = 1:8,
+rf.grid <- expand.grid(mtry = 1:14,
                        splitrule = "gini",
                        min.node.size = 1:10)
 set.seed(1)
@@ -185,8 +185,9 @@ saveRDS(rf.fit_Kappa, "rf.fit_Kappa.RDS")
 
 ```{r}
 
+ctrl3 <- trainControl(method = "cv", classProbs = TRUE, savePredictions = "all")
 
-rf.grid <- expand.grid(mtry = 1:8,
+rf.grid <- expand.grid(mtry = 1:14,
                        splitrule = "gini",
                        min.node.size = 1:10)
 set.seed(1)
@@ -198,7 +199,7 @@ rf.fit_Kappa_threshold <- train(disease~., data_train,
 
 saveRDS(rf.fit_Kappa_threshold, "rf_threshold_cv.rds")
 
-resample_stats_rf <- thresholder(rf.fit_Kappa, 
+resample_stats_rf <- thresholder(rf.fit_Kappa_threshold, 
                               threshold = seq(.05, 0.5, by = 0.05), 
                               final = TRUE)
 
@@ -519,6 +520,82 @@ saveRDS(resample_stats_gbmB, "resample_stats_gbmB.rds")
 ```
 
 
+```{r}
+
+
+
+gbmB.grid_expand <- expand.grid(n.trees = c(2000,3000,4000,5000),
+                        interaction.depth = 9:11,
+                        shrinkage = c(0.001,0.003, .005),
+                        n.minobsinnode = 1)
+
+set.seed(1)
+# Binomial loss function
+gbmB.fit_kappa_undersample <- train(disease~., under_data_train, 
+                 tuneGrid = gbmB.grid_expand,
+                 trControl = ctrl,
+                 method = "gbm",
+                 distribution = "bernoulli",
+                 metric = "Kappa",
+                 verbose = FALSE)
+
+###this is actually roc
+
+gbmB.fit_kappa_undersample_real_expand <- train(disease~., under_data_train, 
+                 tuneGrid = gbmB.grid_expand,
+                 trControl = ctrl_ac_kap,
+                 method = "gbm",
+                 distribution = "bernoulli",
+                 metric = "Kappa",
+                 verbose = FALSE)
+
+
+saveRDS(gbmB.fit_kappa_undersample_real_expand, "gbmB.fit_kappa_undersample_real.rds")
+
+max(gbmB.fit_kappa_undersample_real_expand$results$Kappa)
+
+
+gbmB.fit_kappa_undersample_real_expand$bestTune
+
+#testing data
+
+
+
+
+pred_boost_kap_prob = predict(gbmB.fit_kappa, newdata = data_test[,2:18], type = "prob")
+
+pred_boost_kap<- rep("pos", nrow(as.data.frame(pred_boost_kap_prob)))
+
+pred_boost_kap[as.data.frame(pred_boost_kap_prob)$neg>0.5] = "neg"
+
+
+confusionMatrix(data = relevel(as.factor(pred_boost_kap), ref = "pos"),
+                reference = data_test[,1],
+                positive = "pos")
+
+
+
+```
+
+max kappa is .42
+
+best tune is n.trees = 3000, interaction depth = 10, shrinkage = .003
+
+
+random forest undersample
+
+```{r}
+
+set.seed(1)
+rf.fit_undersample <- train(disease~., under_data, 
+                method = "ranger",
+                tuneGrid = rf.grid,
+                metric = "Kappa",
+                trControl = ctrl_ac_kap)
+
+
+
+```
 
 
 
