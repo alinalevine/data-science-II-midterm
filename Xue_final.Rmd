@@ -273,7 +273,10 @@ y_test = data_test$disease
 
 
 Support vector machines is used to find a hyperplane that separate the two-class in feature space.
-Here we consider two types of SVM: linear kernal and radial kernel. For linear kernal, there is one tunning parameter cost, which allows a soft margin. The tolerance for observations being on the wrong side of the margin increases and the margin becomes wild as cost increases. For radial kernel, there are two tunning parameters: sigma and cost. The fit becomes more non-linear as sigma increase. We use 10-fold cross validation to pick the best value of tunning parameter
+Here we consider two types of SVM: linear kernal and radial kernel. For linear kernal, there is one tunning parameter cost, which allows a soft margin. The tolerance for observations being on the wrong side of the margin increases and the margin becomes wild as cost increases. For radial kernel, there are two tunning parameters: sigma and cost. The fit becomes more non-linear as sigma increase. We use 10-fold cross validation to pick the best value of tunning parameter. 
+One thing need to take into consideration is that SVM doesn’t compute the probability, it is like just drawing the plane to split the points, so we can only use accracy and kappa as metric. Also if we want to compare the SVM with other models, we can only use kappa and accuracy as metric not ROC.
+
+From the result of cross validation using kappa as metric, for linear kernal, the best tuning parameter is cost =0.01831564, for radical kernal, the best tuning parameters are sigma = 0.02941308 and cost = 92.41745.
 
 
 ```{r}
@@ -458,9 +461,11 @@ confusionMatrix(data = pred.svmr.test.under,
 ```
 
 
+
+
 ## Unsupervise
 
-For unsupervise learning, we only focus on the 17 predictors: 12 continuous features and 5 categorical features. We try to discover the unknown subgroups in data using clustering and do data visualization which finds a low-dimensional representation of the data that contains as much as possible of the variation. Aim to discover interesting things about the measurements on our features.
+For unsupervise learning, we only focus on the 17 predictors: 12 continuous features and 5 categorical features. We try to discover the unknown subgroups in data using clustering and do data visualization which finds a low-dimensional representation of the data that contains as much as possible of the variation. 
 
 ```{r}
 # 17 features
@@ -473,15 +478,32 @@ dat_c =
   dat %>% 
   select(age, depression_score, fast, ready, frozen, bmi)
 dat_c = scale(dat_c)
+
+# design matrix
+x
 ```
 
 ### Clustering
 
 ```{r}
-# fviz_nbclust(dat, FUNcluster = cluster::pam,method = "silhouette")
+fviz_nbclust(x, FUNcluster = cluster::pam,method = "silhouette")
+set.seed(1)
+pam = pam(x, k=2)
+pam_vis = fviz_cluster(list(data = x, cluster = pam$clustering), 
+                       ellipse.type = "convex", 
+                       geom = c("point","text"),
+                       labelsize = 5, 
+                       palette = "Dark2") + labs(title = "PAM")
+
+pam_vis
 ```
 
-For clustering, we aim to use hierarchical clustering which no need to pre-specify the number of clusters. Since our data is mixed with continuous variables and binary variables, so we cannot use Euclidean distance, Hanhattan distance or Minkowski distance to measure the dissimilarity. One way is to use Gower's distance, which is a composite measure.
+For clustering, k-means and hierarchical clustering were taken into consideration. However, k-means clustering should not be done with data of mixed types. Since k-means is essentially find partitions that minimizes the within-cluster squared Euclidean distances between the clustered observations and the cluster centroid, it should only be used with data where squared Euclidean distances would be meaningful. 
+
+One popular choice is PAM (partitioning around medoids), which is essentially the same as k-means, but is intended to find a sequence of objects called medoids that are centrally located in clusters rather than the centroid. We used fviz_nbclust() to determines and visualized the optimal number of clustering, the result showed that 2 cluster is with the highest average silhouette width, this is consistent with our purpose, since we want to group our data with one cluster for high risk of heart disease and another for low risk. However, from the result of ggplot2_based visualization of PAM, based on the first and second PC for each points, two clusters are not well seperated. Which may indiate that there isn't much clustering for our data.
+
+
+Hierarchical clustering is another way for clustering that no need to pre-specify the number of clusters and based on the dissimilarity of each pair of data. Since our data is mixed with continuous variables and categorical variables, we cannot use Euclidean distance, Hanhattan distance or Minkowski distance to measure the dissimilarity. The challenge with categorical variables is to find a suitable way to represent distances between variable categories and individuals in the factorial space.  One way is to use Gower's distance, which is a composite measure.
 [Gower J. C. A general coefficient of similarity and some of its properties // Biometrics, 1971, 27, 857-872]
 
 However, since we have 6067 observations, it is really hard to plot the cluster dendrogram for our dataset, hence it is hard to evaluate and interpret the results from hierarchical.
@@ -512,7 +534,7 @@ ind4.complete <- cutree(hc.complete, 2)
 
 
 # Who are in the fourth cluster?
-dat[ind4.complete == 4,]
+dat[ind4.complete == 2,]
 ```
 
 
@@ -520,10 +542,10 @@ dat[ind4.complete == 4,]
 ### PCA
 
 
+Principal Components Analysis can also served as a tool for data visualization, which find orthogonal directions of the highest variance, and the first two PCs of the data span the plane that is cloest to the n observations.
 
-Since our features contain both continuous variables and binary variables, PCA cannot directly applied to deal with this mixed type of data. The PCA is really analysis of eigenvectors of covariance matrix. So the problem is how to calculate the "correct" covariance matrix. One of the approaches is to use polychoric correlation for categorical variables. Or look for a non-linear transformation of each variable--whether it be nominal, ordinal, polynomial, or numerical--with optimal scaling. 
+Since our features contain both continuous variables and categorical variables, PCA cannot directly applied to deal with this mixed type of data. The PCA is really analysis of eigenvectors of covariance matrix. So the problem is how to calculate the "correct" covariance matrix for mixed data. One of the approaches is to use polychoric correlation for categorical variables. Or look for a non-linear transformation of each variable--whether it be nominal, ordinal, polynomial, or numerical--with optimal scaling. 
 
-The challenge with categorical variables is to find a suitable way to represent distances between variable categories and individuals in the factorial space. 
 
 The first two principal component direction span a plane along with the observations have the highest variance
 
