@@ -1,20 +1,24 @@
 ---
-title: "Pre_XueYang"
+title: "Xue_final"
 author: "Xue Yang"
-date: "4/4/2019"
+date: "5/15/2019"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-library(tidyverse)
-library(tidyverse)
-library(haven)
-library(corrplot)
-library(caret)
-library(pROC)
+knitr::opts_chunk$set(echo = TRUE)
 ```
 
-
+```{r setup, include=FALSE}
+library(tidyverse)
+library(haven)
+library(caret)
+library(corrplot)
+library(caret)
+library(e1071)
+library(kernlab)
+library(factoextra)
+```
 
 
 ### Data
@@ -266,232 +270,130 @@ y_test = data_test$disease
 
 
 
+### Support vector classifier (linear kernal)
+
+```{r}
+ctrl1 = trainControl(method = "cv")
+```
 
 
-
-
-
-
-# Model Building
-
-## Naive Bayes
-
-```{r, warning=FALSE}
+```{r}
+# support vector classifier (linear kernal) on training data
 set.seed(1)
-
-ctrl <- trainControl(method = "repeatedcv",
-                     repeats = 5,
-                     summaryFunction = twoClassSummary,
-                     classProbs = TRUE)
-
-
-
-nbGrid <- expand.grid(usekernel = c(FALSE,TRUE), # false: Guassian density as density for each feature; true: non-parametric kernel estimate as density for each feature
-                      fL = 0:1, # laplace correction: correction of 0 density case
-                      adjust = seq(0,5,by = 1)) # specify the bandwidth
-set.seed(1)
-model.nb <- train(x_train,
+svml.fit <- train(x_train,
                   y_train,
-                  method = "nb",
-                  tuneGrid = nbGrid,
-                  metric = "ROC",
-                  trControl = ctrl)
+                  method = "svmLinear2",
+                  preProcess = c("center", "scale"),
+                  tuneGrid = data.frame(cost = exp(seq(-4,3,len=20))),
+                  metric = "Kappa",
+                  trControl = ctrl1)
 
-plot(model.nb)
+ggplot(svml.fit, highlight = TRUE)
 
-model.nb$beswtTune
-tr#    fL usekernel adjust
-# 15  0      TRUE      2
-
-model.knn$results
-
-varImp(model.nb)
 ```
 
-Evaluate the test set performance using ROC:
+From the result of 10-fold cross-validation, the optimal tuning parameter is:
+
+```{r}
+svml.fit$bestTune
+```
+
+Test data performance:
+```{r}
+pred.svml.test <- predict.train(svml.fit, newdata = x_test)
+confusionMatrix(data = pred.svml.test, 
+                reference = y_test)
+
+```
+
+
+### Support vector machine (radial kernel)
 
 ```{r, warning=FALSE}
-nb.pred <- predict(model.nb, newdata = x_test, type = "prob")[,1]
+# Support vector machine (radial kernel) on the training data
+svmr.grid <- expand.grid(C = exp(seq(-4,5,len=20)),
+                         sigma = exp(seq(-9,-1,len=20)))
+set.seed(1)             
+svmr.fit <- train(x_train,
+                  y_train,
+                  method = "svmRadial",
+                  preProcess = c("center", "scale"),
+                  tuneGrid = svmr.grid,
+                  metric = "Kappa",
+                  trControl = ctrl1)
 
-roc.nb <- roc(y_test, nb.pred, levels = c("neg", "pos"))
-roc.nb$auc 
-# Area under the curve: 0.8367
-mean(roc.nb$sensitivities)
-# [1] 0.8233467
-mean(roc.nb$specificities)
-# [1] 0.5130937
-plot(roc.nb, legacy.axes = TRUE, print.auc = TRUE)
+ggplot(svmr.fit, highlight = TRUE)
 
-nb.pred.test <- rep("neg", length(nb.pred))
-nb.pred.test[nb.pred>0.5] <- "pos"
-confusionMatrix(data = as.factor(nb.pred.test), reference = y_test)
+```
+
+From the result of 10-fold cross-validation, the optimal tuning parameter is:
+
+```{r}
+svmr.fit$bestTune
+```
 
 
+Test data performance:
+```{r}
+pred.svmr.test <- predict.train(svmr.fit, newdata = x_test)
+confusionMatrix(data = pred.svmr.test, 
+                reference = y_test)
 
+```
 
+Model selection:
 
+```{r}
+resamp <- resamples(list(svml = svml.fit, svmr = svmr.fit))
+summary(resamp)
+bwplot(resamp)
 ```
 
 
 
 
-## KNN
+## Unsupervise
 
+Only focus on the predictors: 12 continuous predictors and 5 categorical predictors.
 
 ```{r}
-# KNN
-set.seed(1)
-model.knn <- train(x_train,
-                   y_train,
-                   method = "knn",
-                   metric = "ROC",
-                   preProcess = c("center","scale"), 
-                   tuneGrid = data.frame(k = seq(1,500,by=5)),
-                   trControl = ctrl)
-dev.off()
-plot(model.knn)
-model.knn$bestTune
-#  k
-# 85 421
-print(model.knn)
-
-
-mean(model.knn$results$ROC)
-
-varImp(model.knn)
+# 17 features
+dat = 
+  full_data %>% 
+  select(-disease)
+  
 ```
 
-Evaluate the test set performance using ROC:
+### Clustering
+
+Since our data is mixed with continuous variables and binary variables, so we cannot use Euclidean distance, Hanhattan distance and Minkowski distance to measure the dissimilarity. One way is to use Gower similarity (𝐺𝑆).
 ```{r}
-#trans = preProcess(x_train, method = c("center","scale"))
-#knn.pred <- predict(model.knn$finalModel, newdata = predict(trans,x_test), type = "prob")[,2]
-
-knn.pred <- predict.train(model.knn, newdata = x_test, type = "prob")[,1]
-roc.knn <- roc(y_test, knn.pred, levels = c("neg", "pos"))
-plot(roc.knn, legacy.axes = TRUE, print.auc = TRUE)
-
-roc.knn$auc
-# Area under the curve: 0.8637
-mean(roc.knn$sensitivities)
-# [1] 0.6500978
-mean(roc.knn$specificities)
-# [1] 0.6757431
-plot(roc.knn, legacy.axes = TRUE, print.auc = TRUE)
-
-# using 0.05 as cutoff
-knn.pred <- predict.train(model.knn, newdata = x_test, type = "prob")[,1]
-test.pred.knn <- rep("neg", length(knn.pred))
-test.pred.knn[knn.pred>0.1] <- "pos"
-confusionMatrix(data = as.factor(test.pred.knn), reference = y_test)
-
-```
-
-
-
-
-
-
-```{r}
-# GLM
-set.seed(1)
-model.glm <- train(x_train,
-                   y_train,
-                   method = "glm",
-                   metric = "ROC",
-                   trControl = ctrl)
-
-
-glmnGrid <- expand.grid(.alpha = seq(0, 1, length = 6),
-                        .lambda = exp(seq(-6, -2, length = 20)))
-
-# GLMNET
-set.seed(1)
-model.glmn <- train(x_train,
-                    y_train,
-                    method = "glmnet",
-                    tuneGrid = glmnGrid,
-                    metric = "ROC",
-                    trControl = ctrl)
-
-
-glm.pred <- predict.train(model.glm, newdata = x_test, type = "prob")[,1]
-glmn.pred <- predict.train(model.glmn, newdata = x_test, type = "prob")[,1]
-
-roc.glm <- roc(y_test, glm.pred, levels = c("neg", "pos"))
-roc.glmn <- roc(y_test, glmn.pred, levels = c("neg", "pos"))
-
-roc.glm$auc
-roc.glmn$auc
-
-# LDA
-set.seed(1)
-model.lda <- train(x = x_train,
-                   y = y_train,
-                   method = "lda",
-                   metric = "ROC",
-                   trControl = ctrl)
-
-# QDA
-set.seed(1)
-model.qda <-train(x = x_train,
-                  y = y_train,
-                  method = "qda",
-                  metric = "ROC",
-                  trControl = ctrl)
-
-lda.pred <- predict.train(model.lda, newdata = x_test, type = "prob")[,1]
-qda.pred <- predict.train(model.qda, newdata = x_test, type = "prob")[,1]
-
-roc.lda <- roc(y_test, lda.pred, levels = c("neg", "pos"))
-roc.qda <- roc(y_test, qda.pred, levels = c("neg", "pos"))
-roc.lda$auc
-roc.qda$auc
-   
-```
-
-
-# Model comparison
-
-```{r}
-# model selection based on cross-validation results
-res = resamples(list(GLM = model.glm,GLMNET = model.glmn,
-                     LDA = model.lda, QDA = model.qda,
-                     NB = model.nb, KNN = model.knn))
-summary(res)
-
-bwplot(res, metric = "ROC")
-
+library(cluster)
 ```
 
 ```{r}
-# evaluate the test set performance using ROC
-auc = c(roc.glm$auc[1], roc.glmn$auc[1], roc.lda$auc[1], roc.qda$auc[1], roc.nb$auc[1], roc.knn$auc[1])
-plot(roc.glm, legacy.axes = TRUE)
-plot(roc.glmn, col = 2, add = TRUE)
-plot(roc.lda, col = 3, add = TRUE)
-plot(roc.qda, col = 4, add = TRUE)
-plot(roc.nb, col = 5, add = TRUE)
-plot(roc.knn, col = 6, add = TRUE)
-modelNames <- c("glm","glmn","lda","qda","nb", "knn")
-
-legend("bottomright", legend = paste0(modelNames, ": ", round(auc,3)),
-       col = 1:6, lwd = 2)
+g.dist = daisy(dat, metric="gower", type=list(symm=2))
+hc.complete <- hclust(g.dist, method = "complete")
+hc.average <- hclust(g.dist, method = "average")
+hc.single <- hclust(g.dist, method = "single")
+hc.centroid <- hclust(g.dist, method = "centroid")
 ```
-
 
 ```{r}
-# important predictor
+fviz_dend(hc.complete, k = 4,        
+          cex = 0.3, 
+          palette = "jco", 
+          color_labels_by_k = TRUE,
+          rect = TRUE, rect_fill = TRUE, rect_border = "jco",
+          labels_track_height = 2.5)
 
-varImp(model.glm, scale = FALSE)
-varImp(model.glmn, scale = FALSE)
-varImp(model.lda, scale = FALSE)
-varImp(model.qda, scale = FALSE)
-varImp(model.nb, scale = FALSE)
-varImp(model.knn, scale = FALSE)
+ind4.complete <- cutree(hc.complete, 4)
 
-plot(varImp(model.knn, scale = FALSE))
+# Who are in the fourth cluster?
+dat[ind4.complete == 4,]
 ```
 
 
 
+### PCA
 
