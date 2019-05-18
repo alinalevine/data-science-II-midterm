@@ -136,11 +136,12 @@ tree using undersampling
 
 
 set.seed(1)
-tree_kappa_undsample <- train(disease~., under_data_train, 
+tree_kappa_undersample <- train(under_x_train, under_y_train, 
                    method = "rpart",
-                   tuneGrid = data.frame(cp = exp(seq(-15,-4, len = 200))),
+                   tuneGrid = data.frame(cp = exp(seq(-15,10, len = 200))),
                    trControl = ctrl_ac_kap,
                    metric = "Kappa")
+
 
 ```
 
@@ -169,8 +170,6 @@ saveRDS(rf.fit, "rf.fit_roc.RDS")
 plot(rf.fit)
 
 rf.fit$bestTune
-
-
 
 
 ```
@@ -438,21 +437,22 @@ saveRDS(resample_stats_gbmB, "resample_stats_gbmB.rds")
 
 
 gbmB.grid_expand <- expand.grid(n.trees = c(2000,3000,4000,5000),
-                        interaction.depth = 9:11,
+                        interaction.depth = 8:11,
                         shrinkage = c(0.001,0.003, .005),
                         n.minobsinnode = 1)
 
 set.seed(1)
 # Binomial loss function
-gbmB.fit_kappa_undersample <- train(disease~., under_data_train, 
+gbmB.fit_kappa_undersample <- train(under_x_train, under_y_train, 
                  tuneGrid = gbmB.grid_expand,
-                 trControl = ctrl,
+                 trControl = ctrl_ac_kap,
                  method = "gbm",
                  distribution = "bernoulli",
                  metric = "Kappa",
                  verbose = FALSE)
 
-###this is actually roc
+
+saveRDS(gbmB.fit_kappa_undersample, "gbmB.fit_kappa_undersample.rds")
 
 gbmB.fit_kappa_undersample_real_expand <- train(disease~., under_data_train, 
                  tuneGrid = gbmB.grid_expand,
