@@ -1,0 +1,51 @@
+---
+title: "undersampling"
+author: "JiyueQin"
+date: "May 17, 2019"
+output: html_document
+---
+
+# undersampling
+ 
+no need to run this code chunk.
+
+```{r}
+full_data = readRDS("full_data.rds")
+set.seed(1)
+neg = full_data %>% filter(disease == "neg") %>% sample_frac(0.2)
+set.seed(1)
+under_data = full_data %>% filter(disease == "pos") %>% bind_rows(neg) %>% sample_frac(1)
+
+under_data %>% group_by(disease) %>% summarise(n())
+saveRDS(under_data, "under_data.rds")
+```
+
+# run the code below 
+```{r}
+under_data = readRDS("under_data.rds")
+
+set.seed(1)
+under_rowTrain <- createDataPartition(y = under_data$disease,
+                                p = 0.75,
+                                list = FALSE)
+under_x_full =  model.matrix(disease~., under_data)[,-1]
+
+under_x = under_x_full[, -nearZeroVar(under_x_full)]   # 24 predictors: remove race7 diabete3
+
+
+under_data_train = under_data[under_rowTrain,]
+under_data_test = under_data[-under_rowTrain,]
+
+
+under_x_train = under_x[under_rowTrain,]
+under_x_test = under_x[-under_rowTrain,]
+
+under_y_train = under_data_train$disease
+under_y_test = under_data_test$disease
+
+under_xy_train = cbind(as.data.frame(under_x_train), under_data_train$disease) %>%
+  rename(disease = `under_data_train$disease`)
+under_xy_test = cbind(as.data.frame(under_x_test), under_data_test$disease) %>%
+  rename(disease = `under_data_test$disease`)
+
+```
