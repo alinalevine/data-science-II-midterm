@@ -354,25 +354,40 @@ bwplot(resamp)
 
 ## Unsupervise
 
-Only focus on the predictors: 12 continuous predictors and 5 categorical predictors.
+For unsupervise learning, we only focus on the 17 predictors: 12 continuous features and 5 categorical features. We try to discover the unknown subgroups in data using clustering and do data visualization which finds a low-dimensional representation of the data that contains as much as possible of the variation. Aim to discover interesting things about the measurements on our features.
 
 ```{r}
 # 17 features
 dat = 
   full_data %>% 
   select(-disease)
-  
+
+# 5 binary features
+dat_c = 
+  dat %>% 
+  select(age, depression_score, fast, ready, frozen, bmi)
+dat_c = scale(dat_c)
 ```
 
 ### Clustering
 
-Since our data is mixed with continuous variables and binary variables, so we cannot use Euclidean distance, Hanhattan distance and Minkowski distance to measure the dissimilarity. One way is to use Gower similarity (𝐺𝑆).
+```{r}
+# fviz_nbclust(dat, FUNcluster = cluster::pam,method = "silhouette")
+```
+
+For clustering, we aim to use hierarchical clustering which no need to pre-specify the number of clusters. Since our data is mixed with continuous variables and binary variables, so we cannot use Euclidean distance, Hanhattan distance or Minkowski distance to measure the dissimilarity. One way is to use Gower's distance, which is a composite measure.
+[Gower J. C. A general coefficient of similarity and some of its properties // Biometrics, 1971, 27, 857-872]
+
+However, since we have 6067 observations, it is really hard to plot the cluster dendrogram for our dataset, hence it is hard to evaluate and interpret the results from hierarchical.
 ```{r}
 library(cluster)
 ```
 
 ```{r}
-g.dist = daisy(dat, metric="gower", type=list(symm=2))
+g.dist = daisy(dat, metric="gower", stand = FALSE, type = list())
+
+summary(g.dist)
+
 hc.complete <- hclust(g.dist, method = "complete")
 hc.average <- hclust(g.dist, method = "average")
 hc.single <- hclust(g.dist, method = "single")
@@ -380,14 +395,15 @@ hc.centroid <- hclust(g.dist, method = "centroid")
 ```
 
 ```{r}
-fviz_dend(hc.complete, k = 4,        
+fviz_dend(hc.complete, k = 2,        
           cex = 0.3, 
           palette = "jco", 
           color_labels_by_k = TRUE,
           rect = TRUE, rect_fill = TRUE, rect_border = "jco",
           labels_track_height = 2.5)
 
-ind4.complete <- cutree(hc.complete, 4)
+ind4.complete <- cutree(hc.complete, 2)
+
 
 # Who are in the fourth cluster?
 dat[ind4.complete == 4,]
@@ -396,4 +412,29 @@ dat[ind4.complete == 4,]
 
 
 ### PCA
+
+
+
+Since our features contain both continuous variables and binary variables, PCA cannot directly applied to deal with this mixed type of data. The PCA is really analysis of eigenvectors of covariance matrix. So the problem is how to calculate the "correct" covariance matrix. One of the approaches is to use polychoric correlation for categorical variables. Or look for a non-linear transformation of each variable--whether it be nominal, ordinal, polynomial, or numerical--with optimal scaling. 
+
+The challenge with categorical variables is to find a suitable way to represent distances between variable categories and individuals in the factorial space. 
+
+The first two principal component direction span a plane along with the observations have the highest variance
+
+```{r}
+pca = prcomp(dat_c)
+pca$rotation
+
+var = get_pca_var(pca)
+corrplot(var$cor)
+
+fviz_eig(pca, addlabels = TRUE)
+
+fviz_pca_var(pca, col.var = "steelblue", repel = TRUE)
+fviz_pca_ind(pca,
+             habillage = ifelse(full_data_binary_subset$disease==1,"Heart Disease","Non Heart Disease"),
+             label = "none",
+             addEllipses = TRUE)
+```
+
 
