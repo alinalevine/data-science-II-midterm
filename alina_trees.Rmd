@@ -488,6 +488,40 @@ mod1 <- train(disease ~ ., data = sample_frac(data_train, 0.1),
 ```
 
 
+```{r}
+
+
+
+gbmB.grid <- expand.grid(n.trees = c(2000,3000,4000,5000),
+                        interaction.depth = 1:10,
+                        shrinkage = c(.0005, 0.001,0.003),
+                        n.minobsinnode = 1)
+set.seed(1)
+# Binomial loss function
+gbmB.fit_kappa_threshold <- train(disease~., data_train, 
+                 tuneGrid = gbmB.grid,
+                 trControl = ctrl3,
+                 method = "gbm",
+                 distribution = "bernoulli",
+                 metric = "Kappa",
+                 verbose = FALSE)
+
+
+resample_stats_gbmB <- thresholder(gbmB.fit_kappa_threshold, 
+                              threshold = seq(.05, 0.5, by = 0.05), 
+                              final = TRUE)
+
+saveRDS(gbmB.fit_kappa_threshold, "gbmB.fit_kappa_threshold.rds")
+
+saveRDS(resample_stats_gbmB, "resample_stats_gbmB.rds")
+
+
+```
+
+
+
+
+
 
 
 ```{r}
