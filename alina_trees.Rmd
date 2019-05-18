@@ -92,6 +92,9 @@ resample_stats_tree <- thresholder(tree_kappa_thresholds,
                               threshold = seq(.05, 0.5, by = 0.05), 
                               final = TRUE)
 
+saveRDS(resample_stats_tree, "resample_stats_tree.rds")
+saveRDS(tree_kappa_thresholds, "tree_kappa_thresholds.rds")
+
 ```
 
 
@@ -125,6 +128,23 @@ sensitivity = .101695
 specificity = .9897
 
 
+
+
+tree using undersampling
+
+```{r}
+
+
+set.seed(1)
+tree_kappa_undsample <- train(disease~., under_data_train, 
+                   method = "rpart",
+                   tuneGrid = data.frame(cp = exp(seq(-15,-4, len = 200))),
+                   trControl = ctrl_ac_kap,
+                   metric = "Kappa")
+
+```
+
+
 #Random Forest
 
 ###Using ROC
@@ -132,9 +152,11 @@ specificity = .9897
 ```{r}
 
 
-rf.grid <- expand.grid(mtry = 1:8,
+
+rf.grid <- expand.grid(mtry = 1:14,
                        splitrule = "gini",
                        min.node.size = 1:10)
+
 set.seed(1)
 rf.fit <- train(disease~., data_train, 
                 method = "ranger",
@@ -160,7 +182,7 @@ rf.fit$bestTune
 
 ```{r}
 
-rf.grid <- expand.grid(mtry = 1:8,
+rf.grid <- expand.grid(mtry = 1:14,
                        splitrule = "gini",
                        min.node.size = 1:10)
 set.seed(1)
@@ -185,8 +207,9 @@ saveRDS(rf.fit_Kappa, "rf.fit_Kappa.RDS")
 
 ```{r}
 
+ctrl3 <- trainControl(method = "cv", classProbs = TRUE, savePredictions = "all")
 
-rf.grid <- expand.grid(mtry = 1:8,
+rf.grid <- expand.grid(mtry = 1:14,
                        splitrule = "gini",
                        min.node.size = 1:10)
 set.seed(1)
@@ -198,7 +221,7 @@ rf.fit_Kappa_threshold <- train(disease~., data_train,
 
 saveRDS(rf.fit_Kappa_threshold, "rf_threshold_cv.rds")
 
-resample_stats_rf <- thresholder(rf.fit_Kappa, 
+resample_stats_rf <- thresholder(rf.fit_Kappa_threshold, 
                               threshold = seq(.05, 0.5, by = 0.05), 
                               final = TRUE)
 
@@ -286,6 +309,8 @@ ggplot(gbmB.fit)
 
 
 saveRDS(gbmB.fit, "gbmb.fit2.RDS")
+
+boostroc = readRDS("gbmb.fit2.RDS")
 
 ```
 
@@ -376,117 +401,6 @@ AUC is .827
 kappa is .0207
 
 
-```{r}
-
-
-thresh_code <- getModelInfo("rf", regex = FALSE)[[1]]
-thresh_code$type <- c("Classification")
-## Add the threshold as another tuning parameter
-thresh_code$parameters <- data.frame(parameter = c("mtry", "threshold"),
-                                     class = c("numeric", "numeric"),
-                                     label = c("#Randomly Selected Predictors",
-                                               "Probability Cutoff"))
-
-
-thresh_code$grid <- function(x, y, len = NULL, search = "grid") {
-  p <- ncol(x)
-  if(search == "grid") {
-    grid <- expand.grid(mtry = 1:floor(sqrt(p)), 
-                        threshold = seq(.01, .99, length = len))
-    } else {
-      grid <- expand.grid(mtry = sample(1:p, size = len),
-                          threshold = runif(runif, min = 0, max = 1))
-      }
-  grid
-}
-
-thresh_code$loop = function(grid) {   
-  library(dplyr)
-  loop <- ddply(grid, c("mtry"),
-                function(x) c(threshold = max(x$threshold)))
-  submodels <- vector(mode = "list", length = nrow(loop))
-  for(i in seq(along = loop$threshold)) {
-    index <- which(grid$mtry == loop$mtry[i])
-    cuts <- grid[index, "threshold"] 
-    submodels[[i]] <- data.frame(threshold = cuts[cuts != loop$threshold[i]])
-    }    
-  list(loop = loop, submodels = submodels)
-}
-
-
-## Fit the model independent of the threshold parameter
-thresh_code$fit = function(x, y, wts, param, lev, last, classProbs, ...) { 
-  if(length(levels(y)) != 2)
-    stop("This works only for 2-class problems")
-  randomForest(x, y, mtry = param$mtry, ...)
-  }
-
-
-thresh_code$predict = function(modelFit, newdata, submodels = NULL) {
-  class1Prob <- predict(modelFit, 
-                        newdata, 
-                        type = "prob")[, modelFit$obsLevels[1]]
-  ## Raise the threshold for class #1 and a higher level of
-  ## evidence is needed to call it class 1 so it should 
-  ## decrease sensitivity and increase specificity
-  out <- ifelse(class1Prob >= modelFit$tuneValue$threshold,
-                modelFit$obsLevels[1], 
-                modelFit$obsLevels[2])
-  if(!is.null(submodels)) {
-    tmp2 <- out
-    out <- vector(mode = "list", length = length(submodels$threshold))
-    out[[1]] <- tmp2
-    for(i in seq(along = submodels$threshold)) {
-      out[[i+1]] <- ifelse(class1Prob >= submodels$threshold[[i]],
-                           modelFit$obsLevels[1], 
-                           modelFit$obsLevels[2])
-      }
-    } 
-  out  
-  }
-
-
-thresh_code$prob = function(modelFit, newdata, submodels = NULL) {
-  out <- as.data.frame(predict(modelFit, newdata, type = "prob"))
-  if(!is.null(submodels)) {
-    probs <- out
-    out <- vector(mode = "list", length = length(submodels$threshold)+1)
-    out <- lapply(out, function(x) probs)
-    } 
-  out 
-}
-
-
-
-fourStats <- function (data, lev = levels(data$obs), model = NULL) {
-  ## This code will get use the area under the ROC curve and the
-  ## sensitivity and specificity values using the current candidate
-  ## value of the probability threshold.
-  out <- c(twoClassSummary(data, lev = levels(data$obs), model = NULL))
-  
-  ## The best possible model has sensitivity of 1 and specificity of 1. 
-  ## How far are we from that value?
-  coords <- matrix(c(1, 1, out["Spec"], out["Sens"]), 
-                   ncol = 2, 
-                   byrow = TRUE)
-  colnames(coords) <- c("Spec", "Sens")
-  rownames(coords) <- c("Best", "Current")
-  c(out, Dist = dist(coords)[1])
-}
-
-
-
-mod1 <- train(disease ~ ., data = sample_frac(data_train, 0.1),
-              method = thresh_code,
-              ## Minimize the distance to the perfect model
-              metric = "Kappa",
-              maximize = FALSE,
-              tuneLength = 20,
-              ntree = 1000,
-              trControl = ctrl_ac_kap)
-
-```
-
 
 ```{r}
 
@@ -519,6 +433,88 @@ saveRDS(resample_stats_gbmB, "resample_stats_gbmB.rds")
 ```
 
 
+```{r}
+
+
+
+gbmB.grid_expand <- expand.grid(n.trees = c(2000,3000,4000,5000),
+                        interaction.depth = 9:11,
+                        shrinkage = c(0.001,0.003, .005),
+                        n.minobsinnode = 1)
+
+set.seed(1)
+# Binomial loss function
+gbmB.fit_kappa_undersample <- train(disease~., under_data_train, 
+                 tuneGrid = gbmB.grid_expand,
+                 trControl = ctrl,
+                 method = "gbm",
+                 distribution = "bernoulli",
+                 metric = "Kappa",
+                 verbose = FALSE)
+
+###this is actually roc
+
+gbmB.fit_kappa_undersample_real_expand <- train(disease~., under_data_train, 
+                 tuneGrid = gbmB.grid_expand,
+                 trControl = ctrl_ac_kap,
+                 method = "gbm",
+                 distribution = "bernoulli",
+                 metric = "Kappa",
+                 verbose = FALSE)
+
+
+saveRDS(gbmB.fit_kappa_undersample_real_expand, "gbmB.fit_kappa_undersample_real.rds")
+
+max(gbmB.fit_kappa_undersample_real_expand$results$Kappa)
+
+
+gbmB.fit_kappa_undersample_real_expand$bestTune
+
+#testing data
+
+
+
+
+pred_boost_kap_prob = predict(gbmB.fit_kappa, newdata = data_test[,2:18], type = "prob")
+
+pred_boost_kap<- rep("pos", nrow(as.data.frame(pred_boost_kap_prob)))
+
+pred_boost_kap[as.data.frame(pred_boost_kap_prob)$neg>0.5] = "neg"
+
+
+confusionMatrix(data = relevel(as.factor(pred_boost_kap), ref = "pos"),
+                reference = data_test[,1],
+                positive = "pos")
+
+
+
+```
+
+max kappa is .42
+
+best tune is n.trees = 3000, interaction depth = 10, shrinkage = .003
+
+
+random forest undersample
+
+```{r}
+
+set.seed(1)
+rf.fit_undersample <- train(under_x_train, under_y_train, 
+                method = "ranger",
+                tuneGrid = rf.grid,
+                metric = "Kappa",
+                trControl = ctrl_ac_kap)
+
+ggplot(rf.fit_undersample)
+
+
+saveRDS(rf.fit_undersample, "rf.fit_undersample.RDS")
+
+rf.fit_undersample$bestTune
+
+
+```
 
 
 
