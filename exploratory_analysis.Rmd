@@ -45,10 +45,8 @@ summary = as.data.frame(xy_train) %>%
             total_heavy_drinker = sum(heavy_drinker1)/length(heavy_drinker1),
             total_drinker = sum(drinker1)/length(drinker1))
 
-<<<<<<< HEAD
 
 write.csv(summary, "summary.csv")
-=======
 summary = data_train %>%
   group_by(disease) %>%
   summarize(total_diabetes = sum(diabete == "1")/n(),
@@ -57,6 +55,6 @@ summary = data_train %>%
             total_heavy_drinker = sum(heavy_drinker == "1")/n(),
             total_drinker = sum(drinker == "1")/n())
 
->>>>>>> f3a6713d48ba59989a1174a2b23684233d63258e
+
 ```
 

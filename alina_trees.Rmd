@@ -1,0 +1,450 @@
+---
+title: "alina_trees"
+author: "Alina Levine"
+date: "May 15, 2019"
+output: html_document
+---
+
+##regression tree with ROC
+
+```{r setup, include=FALSE}
+
+library(ISLR)
+
+
+set.seed(1)
+
+
+ctrl <- trainControl(method = "cv",
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE)
+set.seed(1)
+
+tree <- train(disease~., data_train, 
+                   method = "rpart",
+                   tuneGrid = data.frame(cp = exp(seq(-17,2, len = 100))),
+                   trControl = ctrl,
+              metric = "ROC")
+
+ggplot(tree, highlight = TRUE)
+rpart.plot(tree$finalModel)
+
+saveRDS(tree, "tree.RDS")
+
+tree$bestTune
+
+#highest ROC is .8003324
+
+tree$finalModel$cptable
+
+```
+
+There are 15 terminal nodes
+
+##Tree: use Kappa to tune
+
+```{r}
+set.seed(1)
+ctrl_ac_kap <- trainControl(method = "cv")
+
+set.seed(1)
+tree_kappa <- train(disease~., data_train, 
+                   method = "rpart",
+                   tuneGrid = data.frame(cp = exp(seq(-15,-4, len = 200))),
+                   trControl = ctrl_ac_kap,
+                   metric = "Kappa")
+
+ggplot(tree_kappa, highlight = TRUE)
+rpart.plot(tree$finalModel)
+
+tree_kappa$bestTune ## cp .00368
+
+tree_kappa$results
+
+rpart.plot(tree_kappa$finalModel)
+
+saveRDS(tree_kappa, "tree_kappa.RDS")
+
+#15 terminal nodes, just like ROC tuning
+
+```
+
+
+
+
+###Tree Tuned by ROC Testing ROC and Kappa/Accuracy
+
+```{r}
+
+pred_tree_prob = predict(tree, newdata = data_test[, ,2:18], type = "prob")
+
+pred_tree<- rep("pos", nrow(as.data.frame(pred_tree_prob)))
+pred_tree[as.data.frame(pred_tree_prob)$neg>0.5] = "neg"
+
+
+confusionMatrix(data = relevel(as.factor(pred_tree), ref = "pos"),
+                reference = data_test[,1],
+                positive = "pos")
+
+roc.tree_test =roc(data_test$disease, as.numeric(pred_tree_prob[,1]),levels =c("neg", "pos"))
+
+plot(roc.tree_test, legacy.axes = TRUE, print.auc = TRUE)
+
+
+
+```
+
+
+Accuracy = .9551
+Kappa = .1323
+sensitivity = .101695
+specificity = .9897
+
+
+#Random Forest
+
+###Using ROC
+
+```{r}
+
+
+rf.grid <- expand.grid(mtry = 1:8,
+                       splitrule = "gini",
+                       min.node.size = 1:10)
+set.seed(1)
+rf.fit <- train(disease~., data_train, 
+                method = "ranger",
+                tuneGrid = rf.grid,
+                metric = "ROC",
+                trControl = ctrl)
+
+saveRDS(rf.fit, "rf.fit_roc.RDS")
+
+plot(rf.fit)
+
+rf.fit$bestTune
+
+
+
+
+```
+
+
+
+
+###random forest Using Kappa
+
+```{r}
+
+rf.grid <- expand.grid(mtry = 1:8,
+                       splitrule = "gini",
+                       min.node.size = 1:10)
+set.seed(1)
+rf.fit_Kappa <- train(disease~., data_train, 
+                method = "ranger",
+                tuneGrid = rf.grid,
+                metric = "Kappa",
+                trControl = ctrl_ac_kap)
+
+rf.fit_Kappa$results$Kappa
+
+rf.fit_Kappa$bestTune
+
+saveRDS(rf.fit_Kappa, "rf.fit_Kappa.RDS")
+
+```
+
+#mtry = 1, min.node.size = 1, largest kappa is 0
+
+
+##random forest test set performance using roc
+
+```{r}
+
+
+pred_rf_prob = predict(rf.fit, newdata = data_test[,2:18], type = "prob")
+
+pred_rf<- rep("pos", nrow(as.data.frame(pred_rf_prob)))
+
+pred_rf[as.data.frame(pred_rf_prob)$neg>0.5] = "neg"
+
+pred_rf = as.factor(c(pred_rf, "pos"))
+pred_rf = pred_rf[1:1516]
+
+
+confusionMatrix(data = relevel(as.factor(pred_rf), ref = "pos"),
+                reference = data_test[,1],
+                positive = "pos")
+
+
+roc.rf_test =roc(data_test$disease, pred_rf_prob[,1],levels =c("neg", "pos"))
+
+plot(roc.rf_test,  legacy.axes = TRUE, print.auc = TRUE)
+```
+
+test accuracy = .9611
+kappa = 0
+sensitivity = 0
+specificity = 1
+testAUC = .84
+
+
+
+###Random forest test set performance using kappa
+
+```{r}
+
+
+
+pred_rf_kap = predict(rf.fit_Kappa, newdata = data_test[,2:18])
+
+
+pred_rf_kap = as.factor(c(pred_rf, "pos"))
+pred_rf_kap = pred_rf[1:1516]
+
+
+confusionMatrix(data = relevel(as.factor(pred_rf_kap), ref = "pos"),
+                reference = data_test[,1],
+                positive = "pos")
+
+```
+
+Kappa = 0
+sens: 0 
+spec: 1
+accuracy = .96
+
+
+
+##boosting using ROC
+
+```{r}
+
+gbmB.grid <- expand.grid(n.trees = c(2000,3000,4000,5000),
+                        interaction.depth = 8:10,
+                        shrinkage = c(.0005, 0.001,0.003),
+                        n.minobsinnode = 1)
+set.seed(1)
+# Binomial loss function
+gbmB.fit <- train(disease~., data_train, 
+                 tuneGrid = gbmB.grid,
+                 trControl = ctrl,
+                 method = "gbm",
+                 distribution = "bernoulli",
+                 metric = "ROC",
+                 verbose = FALSE)
+
+ggplot(gbmB.fit)
+
+
+saveRDS(gbmB.fit, "gbmb.fit2.RDS")
+
+```
+
+#test set performance roc boosting
+
+```{r}
+
+
+pred_boost_prob = predict(gbmB.fit, newdata = data_test[,2:18], type = "prob")
+
+pred_boost<- rep("pos", nrow(as.data.frame(pred_boost_prob)))
+
+pred_boost[as.data.frame(pred_boost_prob)$neg>0.5] = "neg"
+
+
+confusionMatrix(data = relevel(as.factor(pred_boost), ref = "pos"),
+                reference = data_test[,1],
+                positive = "pos")
+
+roc.boost_test =roc(data_test$disease, pred_boost_prob[,1],levels =c("neg", "pos"))
+
+plot(roc.boost_test,  legacy.axes = TRUE, print.auc = TRUE)
+
+
+```
+
+#kappa: -.0026 
+
+
+#boosting using kappa
+
+```{r}
+
+
+gbmB.grid <- expand.grid(n.trees = c(2000,3000,4000,5000),
+                        interaction.depth = 8:10,
+                        shrinkage = c(.0005, 0.001,0.003),
+                        n.minobsinnode = 1)
+set.seed(1)
+# Binomial loss function
+gbmB.fit_kappa <- train(disease~., data_train, 
+                 tuneGrid = gbmB.grid,
+                 trControl = ctrl_ac_kap,
+                 method = "gbm",
+                 distribution = "bernoulli",
+                 metric = "Kappa",
+                 verbose = FALSE)
+#
+
+saveRDS(gbmB.fit_kappa, "gbmB.fit_kappa.RDS")
+
+
+
+max_ROC_cv_boost_kappa = max(gbmB.fit$results$ROC)
+tuning_param_boost_kappa = gbmB.fit$bestTune
+
+```
+
+max ROC is .8653252
+
+ n.trees interaction.depth shrinkage n.minobsinnode
+23    4000                10     0.001              1
+
+
+#testing set
+
+```{r}
+
+
+pred_boost_kap_prob = predict(gbmB.fit_kappa, newdata = data_test[,2:18], type = "prob")
+
+pred_boost_kap<- rep("pos", nrow(as.data.frame(pred_boost_kap_prob)))
+
+pred_boost_kap[as.data.frame(pred_boost_kap_prob)$neg>0.5] = "neg"
+
+
+confusionMatrix(data = relevel(as.factor(pred_boost_kap), ref = "pos"),
+                reference = data_test[,1],
+                positive = "pos")
+
+roc.boost_kap_test =roc(data_test$disease, pred_boost_kap_prob[,1],levels =c("neg", "pos"))
+
+plot(roc.boost_kap_test,  legacy.axes = TRUE, print.auc = TRUE)
+
+```
+
+AUC is .827
+kappa is .0207
+
+
+```{r}
+
+
+thresh_code <- getModelInfo("rf", regex = FALSE)[[1]]
+thresh_code$type <- c("Classification")
+## Add the threshold as another tuning parameter
+thresh_code$parameters <- data.frame(parameter = c("mtry", "threshold"),
+                                     class = c("numeric", "numeric"),
+                                     label = c("#Randomly Selected Predictors",
+                                               "Probability Cutoff"))
+
+
+thresh_code$grid <- function(x, y, len = NULL, search = "grid") {
+  p <- ncol(x)
+  if(search == "grid") {
+    grid <- expand.grid(mtry = 1:floor(sqrt(p)), 
+                        threshold = seq(.01, .99, length = len))
+    } else {
+      grid <- expand.grid(mtry = sample(1:p, size = len),
+                          threshold = runif(runif, min = 0, max = 1))
+      }
+  grid
+}
+
+thresh_code$loop = function(grid) {   
+  library(dplyr)
+  loop <- ddply(grid, c("mtry"),
+                function(x) c(threshold = max(x$threshold)))
+  submodels <- vector(mode = "list", length = nrow(loop))
+  for(i in seq(along = loop$threshold)) {
+    index <- which(grid$mtry == loop$mtry[i])
+    cuts <- grid[index, "threshold"] 
+    submodels[[i]] <- data.frame(threshold = cuts[cuts != loop$threshold[i]])
+    }    
+  list(loop = loop, submodels = submodels)
+}
+
+
+## Fit the model independent of the threshold parameter
+thresh_code$fit = function(x, y, wts, param, lev, last, classProbs, ...) { 
+  if(length(levels(y)) != 2)
+    stop("This works only for 2-class problems")
+  randomForest(x, y, mtry = param$mtry, ...)
+  }
+
+
+thresh_code$predict = function(modelFit, newdata, submodels = NULL) {
+  class1Prob <- predict(modelFit, 
+                        newdata, 
+                        type = "prob")[, modelFit$obsLevels[1]]
+  ## Raise the threshold for class #1 and a higher level of
+  ## evidence is needed to call it class 1 so it should 
+  ## decrease sensitivity and increase specificity
+  out <- ifelse(class1Prob >= modelFit$tuneValue$threshold,
+                modelFit$obsLevels[1], 
+                modelFit$obsLevels[2])
+  if(!is.null(submodels)) {
+    tmp2 <- out
+    out <- vector(mode = "list", length = length(submodels$threshold))
+    out[[1]] <- tmp2
+    for(i in seq(along = submodels$threshold)) {
+      out[[i+1]] <- ifelse(class1Prob >= submodels$threshold[[i]],
+                           modelFit$obsLevels[1], 
+                           modelFit$obsLevels[2])
+      }
+    } 
+  out  
+  }
+
+
+thresh_code$prob = function(modelFit, newdata, submodels = NULL) {
+  out <- as.data.frame(predict(modelFit, newdata, type = "prob"))
+  if(!is.null(submodels)) {
+    probs <- out
+    out <- vector(mode = "list", length = length(submodels$threshold)+1)
+    out <- lapply(out, function(x) probs)
+    } 
+  out 
+}
+
+
+
+fourStats <- function (data, lev = levels(data$obs), model = NULL) {
+  ## This code will get use the area under the ROC curve and the
+  ## sensitivity and specificity values using the current candidate
+  ## value of the probability threshold.
+  out <- c(twoClassSummary(data, lev = levels(data$obs), model = NULL))
+  
+  ## The best possible model has sensitivity of 1 and specificity of 1. 
+  ## How far are we from that value?
+  coords <- matrix(c(1, 1, out["Spec"], out["Sens"]), 
+                   ncol = 2, 
+                   byrow = TRUE)
+  colnames(coords) <- c("Spec", "Sens")
+  rownames(coords) <- c("Best", "Current")
+  c(out, Dist = dist(coords)[1])
+}
+
+
+
+mod1 <- train(disease ~ ., data = sample_frac(data_train, 0.1),
+              method = thresh_code,
+              ## Minimize the distance to the perfect model
+              metric = "Kappa",
+              maximize = FALSE,
+              tuneLength = 20,
+              ntree = 1000,
+              trControl = ctrl_ac_kap)
+
+```
+
+
+
+
+```{r}
+
+library(modelr) 
+
+```
+
