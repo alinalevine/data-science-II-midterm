@@ -152,9 +152,11 @@ tree_kappa_undsample <- train(disease~., under_data_train,
 ```{r}
 
 
-rf.grid <- expand.grid(mtry = 1:10,
+
+rf.grid <- expand.grid(mtry = 1:14,
                        splitrule = "gini",
-                       min.node.size = 1:14)
+                       min.node.size = 1:10)
+
 set.seed(1)
 rf.fit <- train(disease~., data_train, 
                 method = "ranger",
@@ -508,6 +510,9 @@ ggplot(rf.fit_undersample)
 
 
 saveRDS(rf.fit_undersample, "rf.fit_undersample.RDS")
+
+rf.fit_undersample$bestTune
+
 
 ```
 
