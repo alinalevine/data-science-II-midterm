@@ -588,5 +588,114 @@ Testing ROc objects
 model.tree.rds = readRDS("model.tree.rds")
 
 
+pred_tree_roc_prob = predict(model.tree.rds, newdata = x_test , type = "prob")
+
+pred_tree_roc<- rep("pos", nrow(as.data.frame(pred_tree_roc_prob)))
+
+pred_tree_roc[as.data.frame(pred_boost_kap_prob)$neg>0.5] = "neg"
+
+
+confusionMatrix(data = relevel(as.factor(pred_boost_kap), ref = "pos"),
+                reference = data_test[,1],
+                positive = "pos")
+
+
+roc.tree_roc =roc(data_test$disease, pred_tree_roc_prob[,1],levels =c("neg", "pos"))
+
+plot(roc.tree_roc,  legacy.axes = TRUE, print.auc = TRUE)
+
+
+
 ```
+
+AUC = .797
+
+```{r}
+
+
+model.tree.rds = readRDS("model.tree.rds")
+
+
+pred_tree_roc_prob = predict(model.tree.rds, newdata = x_test , type = "prob")
+
+pred_tree_roc<- rep("pos", nrow(as.data.frame(pred_tree_roc_prob)))
+
+pred_tree_roc[as.data.frame(pred_tree_roc_prob)$neg>0.5] = "neg"
+
+
+confusionMatrix(data = relevel(as.factor(pred_tree_roc), ref = "pos"),
+                reference = data_test[,1],
+                positive = "pos")
+
+
+roc.tree_roc =roc(data_test$disease, pred_tree_roc_prob[,1],levels =c("neg", "pos"))
+
+plot(roc.tree_roc,  legacy.axes = TRUE, print.auc = TRUE)
+
+
+
+
+```
+
+
+
+gbmb roc testing
+
+```{r}
+
+model.gbmb = readRDS("model.gbmb.rds")
+
+
+pred_gbmb_roc_prob = predict(model.gbmb, newdata = x_test , type = "prob")
+
+pred_gbmb_roc<- rep("pos", nrow(as.data.frame(pred_gbmb_roc_prob)))
+
+pred_gbmb_roc[as.data.frame(pred_gbmb_roc_prob)$neg>0.5] = "neg"
+
+
+confusionMatrix(data = relevel(as.factor(pred_gbmb_roc), ref = "pos"),
+                reference = data_test[,1],
+                positive = "pos")
+
+
+roc.gbmb_roc =roc(data_test$disease, pred_gbmb_roc_prob[,1],levels =c("neg", "pos"))
+
+plot(roc.gbmb_roc,  legacy.axes = TRUE, print.auc = TRUE)
+
+```
+
+
+##random forest test
+
+```{r}
+
+
+
+rf.fit_roc = readRDS("rf.fit_roc.rds")
+
+
+pred_rf_roc_prob = predict(rf.fit_roc, newdata = x_test , type = "prob")
+
+pred_rf_roc<- rep("pos", nrow(as.data.frame(pred_rf_roc_prob)))
+
+pred_rf_roc[as.data.frame(pred_rf_roc_prob)$neg>0.5] = "neg"
+
+
+
+
+roc.rf_roc =roc(data_test$disease, pred_rf_roc_prob[,1],levels =c("neg", "pos"))
+
+plot(roc.rf_roc,  legacy.axes = TRUE, print.auc = TRUE)
+
+```
+
+
+###roc neural networks
+
+```{r}
+
+
+
+```
+
 
