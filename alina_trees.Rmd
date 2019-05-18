@@ -125,6 +125,23 @@ sensitivity = .101695
 specificity = .9897
 
 
+
+
+tree using undersampling
+
+```{r}
+
+
+set.seed(1)
+tree_kappa_undsample <- train(disease~., under_data_train, 
+                   method = "rpart",
+                   tuneGrid = data.frame(cp = exp(seq(-15,-4, len = 200))),
+                   trControl = ctrl_ac_kap,
+                   metric = "Kappa")
+
+```
+
+
 #Random Forest
 
 ###Using ROC
@@ -132,9 +149,9 @@ specificity = .9897
 ```{r}
 
 
-rf.grid <- expand.grid(mtry = 1:8,
+rf.grid <- expand.grid(mtry = 1:10,
                        splitrule = "gini",
-                       min.node.size = 1:10)
+                       min.node.size = 1:14)
 set.seed(1)
 rf.fit <- train(disease~., data_train, 
                 method = "ranger",
@@ -287,6 +304,8 @@ ggplot(gbmB.fit)
 
 
 saveRDS(gbmB.fit, "gbmb.fit2.RDS")
+
+boostroc = readRDS("gbmb.fit2.RDS")
 
 ```
 
@@ -593,7 +612,10 @@ rf.fit_undersample <- train(disease~., under_data,
                 metric = "Kappa",
                 trControl = ctrl_ac_kap)
 
+ggplot(rf.fit_undersample)
 
+
+saveRDS(rf.fit_undersample, "rf.fit_undersample.RDS")
 
 ```
 
