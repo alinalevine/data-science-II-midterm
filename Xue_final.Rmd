@@ -270,13 +270,17 @@ y_test = data_test$disease
 
 
 
-### Support vector classifier (linear kernal)
+
+
+Support vector machines is used to find a hyperplane that separate the two-class in feature space.
+Here we consider two types of SVM: linear kernal and radial kernel. For linear kernal, there is one tunning parameter cost, which allows a soft margin. The tolerance for observations being on the wrong side of the margin increases and the margin becomes wild as cost increases. For radial kernel, there are two tunning parameters: sigma and cost. The fit becomes more non-linear as sigma increase. We use 10-fold cross validation to pick the best value of tunning parameter
+
 
 ```{r}
 ctrl1 = trainControl(method = "cv")
 ```
 
-
+### Support vector classifier (linear kernal)
 ```{r}
 # support vector classifier (linear kernal) on training data
 set.seed(1)
@@ -290,6 +294,7 @@ svml.fit <- train(x_train,
 
 ggplot(svml.fit, highlight = TRUE)
 
+saveRDS(svml.fit, "svml.fit.RDS")
 ```
 
 From the result of 10-fold cross-validation, the optimal tuning parameter is:
@@ -324,6 +329,7 @@ svmr.fit <- train(x_train,
 
 ggplot(svmr.fit, highlight = TRUE)
 
+saveRDS(svmr.fit, "svmr.fit.RDS")
 ```
 
 From the result of 10-fold cross-validation, the optimal tuning parameter is:
@@ -349,7 +355,107 @@ summary(resamp)
 bwplot(resamp)
 ```
 
+## Undersampling
 
+# run the code below 
+```{r}
+under_data = readRDS("under_data.rds")
+
+set.seed(1)
+under_rowTrain <- createDataPartition(y = under_data$disease,
+                                p = 0.75,
+                                list = FALSE)
+under_x_full =  model.matrix(disease~., under_data)[,-1]
+
+under_x = under_x_full[, -nearZeroVar(under_x_full)]   # 24 predictors: remove race7 diabete3
+
+
+under_data_train = under_data[under_rowTrain,]
+under_data_test = under_data[-under_rowTrain,]
+
+
+under_x_train = under_x[under_rowTrain,]
+under_x_test = under_x[-under_rowTrain,]
+
+under_y_train = under_data_train$disease
+under_y_test = under_data_test$disease
+
+under_xy_train = cbind(as.data.frame(under_x_train), under_data_train$disease) %>%
+  rename(disease = `under_data_train$disease`)
+under_xy_test = cbind(as.data.frame(under_x_test), under_data_test$disease) %>%
+  rename(disease = `under_data_test$disease`)
+
+````
+
+```{r}
+ctrl1 = trainControl(method = "cv")
+```
+
+
+```{r}
+# support vector classifier (linear kernal) on undersampling training data
+set.seed(1)
+svml.fit.under <- train(under_x_train,
+                  under_y_train,
+                  method = "svmLinear2",
+                  preProcess = c("center", "scale"),
+                  tuneGrid = data.frame(cost = exp(seq(-4,3,len=20))),
+                  metric = "Kappa",
+                  trControl = ctrl1)
+
+ggplot(svml.fit.under, highlight = TRUE)
+saveRDS(svml.fit.under, "svml.fit.under.RDS")
+```
+
+From the result of 10-fold cross-validation, the optimal tuning parameter is:
+
+```{r}
+svml.fit.under$bestTune
+```
+
+Test data performance:
+```{r}
+pred.svml.test.under <- predict.train(svml.fit.under, newdata = under_x_test)
+confusionMatrix(data = pred.svml.test.under, 
+                reference = under_y_test)
+
+```
+
+
+
+```{r, warning=FALSE}
+# Support vector machine (radial kernel) on the undersampling training data
+svmr.grid <- expand.grid(C = exp(seq(-4,5,len=20)),
+                         sigma = exp(seq(-9,-1,len=20)))
+set.seed(1)             
+svmr.fit.under <- train(under_x_train,
+                  under_y_train,
+                  method = "svmRadial",
+                  preProcess = c("center", "scale"),
+                  tuneGrid = svmr.grid,
+                  metric = "Kappa",
+                  trControl = ctrl1)
+
+ggplot(svmr.fit.under, highlight = TRUE)
+
+saveRDS(svmr.fit.under, "svmr.fit.under.RDS")
+
+```
+
+From the result of 10-fold cross-validation, the optimal tuning parameter is:
+
+```{r}
+svmr.fit.under$bestTune
+```
+
+
+Test data performance:
+```{r}
+pred.svmr.test.under <- predict.train(svmr.fit.under, newdata = under_x_test)
+confusionMatrix(data = pred.svmr.test.under, 
+                reference = under_y_test)
+
+```
 
 
 ## Unsupervise
