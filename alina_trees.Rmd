@@ -69,6 +69,18 @@ saveRDS(tree_kappa, "tree_kappa.RDS")
 
 #15 terminal nodes, just like ROC tuning
 
+#tree undersample
+
+
+set.seed(1)
+tree_kappa_undersample <- train(under_x_train, under_y_train, 
+                   method = "rpart",
+                   tuneGrid = data.frame(cp = exp(seq(-15,-4, len = 200))),
+                   trControl = ctrl_ac_kap,
+                   metric = "Kappa")
+
+saveRDS(tree_kappa_undersample, "tree_kappa_undersample.rds")
+
 ```
 
 
@@ -103,10 +115,10 @@ saveRDS(tree_kappa_thresholds, "tree_kappa_thresholds.rds")
 
 ```{r}
 
-pred_tree_prob = predict(tree, newdata = data_test[, ,2:18], type = "prob")
+pred_tree_prob = predict(tree_kappa_thresholds, newdata = data_test[2:18], type = "prob")
 
-pred_tree<- rep("pos", nrow(as.data.frame(pred_tree_prob)))
-pred_tree[as.data.frame(pred_tree_prob)$neg>0.5] = "neg"
+pred_tree<- rep("neg", nrow(as.data.frame(pred_tree_prob)))
+pred_tree[as.data.frame(pred_tree_prob)$pos>.1] = "pos"
 
 
 confusionMatrix(data = relevel(as.factor(pred_tree), ref = "pos"),
@@ -121,6 +133,10 @@ plot(roc.tree_test, legacy.axes = TRUE, print.auc = TRUE)
 
 ```
 
+#for cutoff of .1: test Kappa is .237
+
+
+#roc
 
 Accuracy = .9551
 Kappa = .1323
@@ -136,11 +152,12 @@ tree using undersampling
 
 
 set.seed(1)
-tree_kappa_undsample <- train(disease~., under_data_train, 
+tree_kappa_undersample <- train(under_x_train, under_y_train, 
                    method = "rpart",
-                   tuneGrid = data.frame(cp = exp(seq(-15,-4, len = 200))),
+                   tuneGrid = data.frame(cp = exp(seq(-15,10, len = 200))),
                    trControl = ctrl_ac_kap,
                    metric = "Kappa")
+
 
 ```
 
@@ -169,8 +186,6 @@ saveRDS(rf.fit, "rf.fit_roc.RDS")
 plot(rf.fit)
 
 rf.fit$bestTune
-
-
 
 
 ```
@@ -206,14 +221,14 @@ saveRDS(rf.fit_Kappa, "rf.fit_Kappa.RDS")
 ###random forest using kappa and threshold probability cv
 
 ```{r}
-
+set.seed(1)
 ctrl3 <- trainControl(method = "cv", classProbs = TRUE, savePredictions = "all")
 
 rf.grid <- expand.grid(mtry = 1:14,
                        splitrule = "gini",
                        min.node.size = 1:10)
 set.seed(1)
-rf.fit_Kappa_threshold <- train(disease~., data_train, 
+rf.fit_Kappa_threshold <- train(x_train, data_train$disease, 
                 method = "ranger",
                 tuneGrid = rf.grid,
                 metric = "Kappa",
@@ -226,7 +241,23 @@ resample_stats_rf <- thresholder(rf.fit_Kappa_threshold,
                               final = TRUE)
 
 saveRDS(resample_stats_rf, "resample_stats_rf.rds")
+
+rf.fit_Kappa_threshold = readRDS("rf.fit_Kappa_threshold")
+
 ```
+
+
+
+rf test using kappa
+
+```{r}
+
+```
+
+
+
+
+
 
 ##random forest test set performance using roc
 
@@ -438,21 +469,22 @@ saveRDS(resample_stats_gbmB, "resample_stats_gbmB.rds")
 
 
 gbmB.grid_expand <- expand.grid(n.trees = c(2000,3000,4000,5000),
-                        interaction.depth = 9:11,
+                        interaction.depth = 8:11,
                         shrinkage = c(0.001,0.003, .005),
                         n.minobsinnode = 1)
 
 set.seed(1)
 # Binomial loss function
-gbmB.fit_kappa_undersample <- train(disease~., under_data_train, 
+gbmB.fit_kappa_undersample <- train(under_x_train, under_y_train, 
                  tuneGrid = gbmB.grid_expand,
-                 trControl = ctrl,
+                 trControl = ctrl_ac_kap,
                  method = "gbm",
                  distribution = "bernoulli",
                  metric = "Kappa",
                  verbose = FALSE)
 
-###this is actually roc
+
+saveRDS(gbmB.fit_kappa_undersample, "gbmB.fit_kappa_undersample.rds")
 
 gbmB.fit_kappa_undersample_real_expand <- train(disease~., under_data_train, 
                  tuneGrid = gbmB.grid_expand,
@@ -518,6 +550,29 @@ rf.fit_undersample$bestTune
 
 
 
+test undersampling
+
+
+```{r}
+
+
+
+pred_boost_under_prob = predict(gbmB.fit_kappa_undersample, newdata = under_data_test[,2:18], type = "prob")
+
+pred_boost_kap<- rep("pos", nrow(as.data.frame(pred_boost_kap_prob)))
+
+pred_boost_kap[as.data.frame(pred_boost_kap_prob)$neg>0.5] = "neg"
+
+
+confusionMatrix(data = relevel(as.factor(pred_boost_kap), ref = "pos"),
+                reference = data_test[,1],
+                positive = "pos")
+
+
+
+
+```
+
 
 
 ```{r}
@@ -525,4 +580,122 @@ rf.fit_undersample$bestTune
 library(modelr) 
 
 ```
+
+
+Testing ROc objects
+
+```{r}
+model.tree.rds = readRDS("model.tree.rds")
+
+
+pred_tree_roc_prob = predict(model.tree.rds, newdata = x_test , type = "prob")
+
+pred_tree_roc<- rep("pos", nrow(as.data.frame(pred_tree_roc_prob)))
+
+pred_tree_roc[as.data.frame(pred_boost_kap_prob)$neg>0.5] = "neg"
+
+
+confusionMatrix(data = relevel(as.factor(pred_boost_kap), ref = "pos"),
+                reference = data_test[,1],
+                positive = "pos")
+
+
+roc.tree_roc =roc(data_test$disease, pred_tree_roc_prob[,1],levels =c("neg", "pos"))
+
+plot(roc.tree_roc,  legacy.axes = TRUE, print.auc = TRUE)
+
+
+
+```
+
+AUC = .797
+
+```{r}
+
+
+model.tree.rds = readRDS("model.tree.rds")
+
+
+pred_tree_roc_prob = predict(model.tree.rds, newdata = x_test , type = "prob")
+
+pred_tree_roc<- rep("pos", nrow(as.data.frame(pred_tree_roc_prob)))
+
+pred_tree_roc[as.data.frame(pred_tree_roc_prob)$neg>0.5] = "neg"
+
+
+confusionMatrix(data = relevel(as.factor(pred_tree_roc), ref = "pos"),
+                reference = data_test[,1],
+                positive = "pos")
+
+
+roc.tree_roc =roc(data_test$disease, pred_tree_roc_prob[,1],levels =c("neg", "pos"))
+
+plot(roc.tree_roc,  legacy.axes = TRUE, print.auc = TRUE)
+
+
+
+
+```
+
+
+
+gbmb roc testing
+
+```{r}
+
+model.gbmb = readRDS("model.gbmb.rds")
+
+
+pred_gbmb_roc_prob = predict(model.gbmb, newdata = x_test , type = "prob")
+
+pred_gbmb_roc<- rep("pos", nrow(as.data.frame(pred_gbmb_roc_prob)))
+
+pred_gbmb_roc[as.data.frame(pred_gbmb_roc_prob)$neg>0.5] = "neg"
+
+
+confusionMatrix(data = relevel(as.factor(pred_gbmb_roc), ref = "pos"),
+                reference = data_test[,1],
+                positive = "pos")
+
+
+roc.gbmb_roc =roc(data_test$disease, pred_gbmb_roc_prob[,1],levels =c("neg", "pos"))
+
+plot(roc.gbmb_roc,  legacy.axes = TRUE, print.auc = TRUE)
+
+```
+
+
+##random forest test
+
+```{r}
+
+
+
+rf.fit_roc = readRDS("rf.fit_roc.rds")
+
+
+pred_rf_roc_prob = predict(rf.fit_roc, newdata = x_test , type = "prob")
+
+pred_rf_roc<- rep("pos", nrow(as.data.frame(pred_rf_roc_prob)))
+
+pred_rf_roc[as.data.frame(pred_rf_roc_prob)$neg>0.5] = "neg"
+
+
+
+
+roc.rf_roc =roc(data_test$disease, pred_rf_roc_prob[,1],levels =c("neg", "pos"))
+
+plot(roc.rf_roc,  legacy.axes = TRUE, print.auc = TRUE)
+
+```
+
+
+###roc neural networks
+
+```{r}
+
+
+
+```
+
 
