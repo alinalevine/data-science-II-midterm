@@ -460,6 +460,11 @@ confusionMatrix(data = pred.svmr.test.under,
 
 ```
 
+```{r}
+resamp <- resamples(list(svml = svml.fit.under, svmr = svmr.fit.under))
+summary(resamp)
+bwplot(resamp)
+```
 
 
 
@@ -534,7 +539,7 @@ ind4.complete <- cutree(hc.complete, 2)
 
 
 # Who are in the fourth cluster?
-dat[ind4.complete == 2,]
+plot(dat[ind4.complete == 2,])
 ```
 
 
@@ -544,10 +549,12 @@ dat[ind4.complete == 2,]
 
 Principal Components Analysis can also served as a tool for data visualization, which find orthogonal directions of the highest variance, and the first two PCs of the data span the plane that is cloest to the n observations.
 
-Since our features contain both continuous variables and categorical variables, PCA cannot directly applied to deal with this mixed type of data. The PCA is really analysis of eigenvectors of covariance matrix. So the problem is how to calculate the "correct" covariance matrix for mixed data. One of the approaches is to use polychoric correlation for categorical variables. Or look for a non-linear transformation of each variable--whether it be nominal, ordinal, polynomial, or numerical--with optimal scaling. 
+Since our features contain both continuous variables and categorical variables, PCA cannot directly applied to deal with this mixed type of data. The PCA is really analysis of eigenvectors of covariance matrix. So the problem is how to calculate the "correct" covariance matrix for mixed data. One of the approaches is to use polychoric correlation for categorical variables. Another approach is look for a non-linear transformation of each variable--whether it be nominal, ordinal, polynomial, or numerical--with optimal scaling. 
 
+Here we only consider 5 continuous feactures, so we can directly use PCA. We focus on the first two PCs for contribution plot, fast (number of fast food meals eaten weekly) and age contribute most the first PC, bmi and depression score contribute most for second PC.
 
-The first two principal component direction span a plane along with the observations have the highest variance
+Figure[] and Figure[] showed the graph of individuals and variables.
+
 
 ```{r}
 pca = prcomp(dat_c)
@@ -558,11 +565,55 @@ corrplot(var$cor)
 
 fviz_eig(pca, addlabels = TRUE)
 
+library(gridExtra)
+a <- fviz_contrib(pca, choice = "var", axes = 1)
+b <- fviz_contrib(pca, choice = "var", axes = 2)
+grid.arrange(a, b, nrow = 2)
+
 fviz_pca_var(pca, col.var = "steelblue", repel = TRUE)
 fviz_pca_ind(pca,
              habillage = ifelse(full_data_binary_subset$disease==1,"Heart Disease","Non Heart Disease"),
              label = "none",
              addEllipses = TRUE)
+
 ```
+
+
+
+
+
+
+
+```{r}
+## rf with roc
+ctrl <- trainControl(method = "cv",
+                     summaryFunction = twoClassSummary,
+                     classProbs = TRUE)
+
+rf.grid <- expand.grid(mtry = 1:14,
+                       splitrule = "gini",
+                       min.node.size = 1:10)
+set.seed(1)
+rf.fit <- train(x_train,
+                y_train, 
+                method = "ranger",
+                tuneGrid = rf.grid,
+                metric = "ROC",
+                trControl = ctrl)
+
+saveRDS(rf.fit, "rf.fit_roc.RDS")
+
+plot(rf.fit)
+
+rf.fit$bestTune
+
+
+rf.pred <- predict.train(rf.fit, newdata = x_test, type = "prob")[,1]
+library(pROC)
+roc.rf <- roc(y_test, rf.pred, levels = c("neg", "pos"))
+print(roc.rf)
+
+```
+
 
 
