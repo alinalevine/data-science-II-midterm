@@ -1,0 +1,585 @@
+---
+title: "final model building and analysis"
+author: "JiyueQin"
+date: "May 16, 2019"
+output: html_document
+---
+
+We are using two types of metrics ROC and Accuracy/Kappa. So we have two train controls.
+```{r, include=FALSE}
+library(tidyverse)
+library(keras)
+library(caret)
+
+```
+
+We are using two types of metrics ROC and Accuracy/Kappa. So we have three train controls.  `ctrl3` is needed for threshold selection.
+
+```{r}
+ctrl <- trainControl(method = "cv", 
+                      summaryFunction = twoClassSummary,
+                      classProbs = TRUE)
+ctrl2 <- trainControl(method = "cv")
+ctrl3 <- trainControl(method = "cv", 
+                      classProbs = TRUE, 
+                      savePredictions = "all")
+
+```
+
+
+# vanilla neural network
+
+```{r}
+
+nnetGrid <- expand.grid(size = seq(from = 2, to = 19, by = 1), 
+                        decay = exp(seq(from = -2, to = 2, length = 15)))
+
+set.seed(1)
+cnnet.fit <- train(x_train,
+                   y_train,
+                   method = "nnet",
+                   tuneGrid = nnetGrid,
+                   preProcess = c("center","scale"),
+                   trControl = ctrl,
+                   metric = "ROC",
+                   trace = FALSE)
+
+ggplot(cnnet.fit, highlight = TRUE) + scale_shape_manual(values = rep(19,15), 
+                                                         guide = FALSE)
+
+saveRDS(cnnet.fit, "cnnet.fit.rds")
+cnnet.fit = readRDS("cnnet.fit.rds")
+
+
+set.seed(1)
+
+cnnet.fit.kappa <- train(x_train,
+                   y_train,
+                   method = "nnet",
+                   tuneGrid = nnetGrid,
+                   preProcess = c("center","scale"),
+                   trControl = ctrl3,
+                   metric = "Kappa",
+                   trace = FALSE)
+saveRDS(cnnet.fit.kappa, "cnnet.fit.kappa.rds")
+cnnet.fit.kappa = readRDS("cnnet.fit.kappa.rds")
+
+set.seed(1)
+
+under_cnnet.fit.kappa <- train(under_x_train,
+                   under_y_train,
+                   method = "nnet",
+                   tuneGrid = nnetGrid,
+                   preProcess = c("center","scale"),
+                   trControl = ctrl3,
+                   metric = "Kappa",
+                   trace = FALSE)
+saveRDS(cnnet.fit.kappa, "cnnet.fit.kappa.rds")
+
+
+```
+
+# deep learning
+
+```{r}
+
+x_train_mtx <- as.matrix(x_train) %>% scale
+
+# Set `dimnames` to `NULL`
+dimnames(x_train_mtx) <- NULL
+
+y_train_mtx = as.numeric(y_train) -1
+y_train_mtx = to_categorical(y_train_mtx) # neg is 1.
+
+x_test_mtx <- as.matrix(x_test) %>% scale
+
+# Set `dimnames` to `NULL`
+dimnames(x_test_mtx) <- NULL
+
+y_test_mtx = as.numeric(y_test) -1
+y_test_mtx = to_categorical(y_test_mtx) # neg is 1.
+
+model <- keras_model_sequential()
+
+model %>% layer_dense(units = 100, activation ="relu",input_shape = ncol(x_train))  %>%
+          layer_dropout(rate = 0.2) %>%
+          layer_dense(units = 50, activation = "relu") %>%
+          layer_dropout(rate = 0.2) %>%
+          layer_dense(units = 2, activation = "sigmoid") 
+# accuracy and loss stay the same if use "softmax"
+summary(model)
+# output shape is (row number, column number) 
+model %>% compile(loss = "binary_crossentropy",
+                  optimizer = "adam", 
+                  metrics = "accuracy")
+
+learn <- model %>% fit(x_train_mtx, y_train_mtx, epochs = 30, 
+                       batch_size = 128,
+                       validation_split = 0.2) 
+plot(learn, labels = TRUE)
+score <- model %>% evaluate(x_test_mtx, y_test_mtx)
+score 
+
+pred_test <- model %>% predict_classes(x_test_mtx)
+pred_test_prob <- model %>% predict_proba(x_test_mtx)
+
+roc.dp <- roc(y_test, pred_test_prob[,2], levels = c("neg", "pos"))
+plot(roc.dp, print.auc=TRUE)
+
+# predict everything to be 0.
+```
+
+# deep learning for undersampling
+
+```{r}
+
+under_x_train_mtx <- as.matrix(under_x_train) %>% scale
+
+# Set `dimnames` to `NULL`
+dimnames(under_x_train_mtx) <- NULL
+
+under_y_train_mtx = as.numeric(under_y_train) -1
+under_y_train_mtx = to_categorical(under_y_train_mtx) # neg is 1.
+
+under_x_test_mtx <- as.matrix(under_x_test) %>% scale
+
+# Set `dimnames` to `NULL`
+dimnames(under_x_test_mtx) <- NULL
+
+under_y_test_mtx = as.numeric(under_y_test) -1
+under_y_test_mtx = to_categorical(under_y_test_mtx) # neg is 1.
+
+under_model <- keras_model_sequential()
+
+under_model %>% layer_dense(units = 100, activation ="relu",input_shape = ncol(under_x_train))  %>%
+          layer_dropout(rate = 0.2) %>%
+          layer_dense(units = 50, activation = "relu") %>%
+          layer_dropout(rate = 0.2) %>%
+          layer_dense(units = 2, activation = "sigmoid") 
+# accuracy and loss stay the same if use "softmax"
+summary(under_model)
+# output shape is (row number, column number) 
+under_model %>% compile(loss = "binary_crossentropy",
+                  optimizer = "adam", 
+                  metrics = "accuracy")
+
+under_learn <- under_model %>% fit(under_x_train_mtx, under_y_train_mtx, epochs = 30, 
+                       batch_size = 64,
+                       validation_split = 0.2) 
+plot(under_learn, labels = TRUE)
+score = under_model %>% evaluate(under_x_test_mtx, under_y_test_mtx)
+score 
+
+under_pred_test <- under_model %>% predict_classes(under_x_test_mtx) 
+under_pred_test_pos = ifelse()
+under_pred_test_prob <- under_model %>% predict_proba(under_x_test_mtx)
+
+under.roc.dp <- roc(under_y_test, under_pred_test_prob[,2], levels = c("neg", "pos"))
+plot(under.roc.dp, print.auc=TRUE)
+confusionMatrix(data = as.factor(under_pred_test), reference = factor(as.numeric(under_y_test)-1))
+# kappa : 0.4676 
+```
+
+
+
+
+# previous model rebuilding
+
+
+## Naive Bayes
+
+```{r, warning=FALSE}
+
+nbGrid <- expand.grid(usekernel = c(FALSE,TRUE),
+                      # false: Guassian density as density for each feature; 
+                      # true: non-parametric kernel estimate as density for each feature
+                      fL = 0:1, # laplace correction: correction of 0 density case
+                      adjust = seq(0,5,by = 1)) # specify the bandwidth
+set.seed(1)
+model.nb <- train(x_train,
+                  y_train,
+                  method = "nb",
+                  tuneGrid = nbGrid,
+                  metric = "ROC",
+                  trControl = ctrl)
+
+plot(model.nb)
+
+
+saveRDS(model.nb, "model.nb.rds")
+model.nb = readRDS("model.nb.rds")
+varImp(model.nb)
+
+set.seed(1)
+under.model.nb.kappa <- train(under_x_train,
+                        under_y_train,
+                        method = "nb",
+                        tuneGrid = nbGrid,
+                        metric = "Kappa",
+                        trControl = ctrl2)
+saveRDS(under.model.nb.kappa, "under.model.nb.kappa.rds")
+under.model.nb.kappa = readRDS("under.model.nb.kappa.rds")
+
+set.seed(1)
+model.nb.kappa.all <- train(x_train,
+                        y_train,
+                        method = "nb",
+                        tuneGrid = nbGrid,
+                        metric = "Kappa",
+                        trControl = ctrl3)
+saveRDS(model.nb.kappa.all, "model.nb.kappa.all.rds")
+model.nb.kappa.all = readRDS("model.nb.kappa.all.rds")
+
+
+```
+
+
+## KNN
+
+
+```{r}
+set.seed(1)
+model.knn <- train(x_train,
+                   y_train,
+                   method = "knn",
+                   metric = "ROC",
+                   preProcess = c("center","scale"), 
+                   tuneGrid = data.frame(k = seq(1,500,by=5)),
+                   trControl = ctrl)
+saveRDS(model.knn, "model.knn.rds")
+model.knn = readRDS("model.knn.rds")
+# gets error if k is larger than 500
+
+set.seed(1)
+under.model.knn.kappa <- train(under_x_train,
+                   under_y_train,
+                   method = "knn",
+                   metric = "Kappa",
+                   preProcess = c("center","scale"), 
+                   tuneGrid = data.frame(k = seq(1,500,by=5)),
+                   trControl = ctrl2)
+saveRDS(under.model.knn.kappa, "under.model.knn.kappa.rds")
+
+set.seed(1)
+model.knn.kappa.all <- train(x_train,
+                   y_train,
+                   method = "knn",
+                   metric = "Kappa",
+                   preProcess = c("center","scale"), 
+                   tuneGrid = data.frame(k = seq(1,500,by=5)),
+                   trControl = ctrl3)
+saveRDS(model.knn.kappa.all, "model.knn.kappa.all.rds")
+model.knn.kappa.all = readRDS("model.knn.kappa.all.rds")
+
+dev.off()
+plot(model.knn)
+
+varImp(model.knn)
+
+```
+
+# GLM
+
+```{r}
+
+set.seed(1)
+model.glm <- train(x_train,
+                   y_train,
+                   method = "glm",
+                   metric = "ROC",
+                   trControl = ctrl)
+
+set.seed(1)
+under.model.glm <- train(under_x_train,
+                   under_y_train,
+                   method = "glm",
+                   metric = "Kappa",
+                   trControl = ctrl2)
+
+
+set.seed(1)
+model.glm.kappa <- train(x_train,
+                   y_train,
+                   method = "glm",
+                   metric = "Kappa",
+                   trControl = ctrl3)
+```
+
+# GLMNET
+```{r}
+glmnGrid <- expand.grid(.alpha = seq(0, 1, length = 6),
+                        .lambda = exp(seq(-6, -2, length = 20)))
+
+set.seed(1)
+model.glmn <- train(x_train,
+                    y_train,
+                    method = "glmnet",
+                    tuneGrid = glmnGrid,
+                    metric = "ROC",
+                    trControl = ctrl)
+saveRDS(model.glmn, "model.glmn.rds")
+set.seed(1)
+under.model.glmn.kappa <- train(under_x_train,
+                    under_y_train,
+                    method = "glmnet",
+                    tuneGrid = glmnGrid,
+                    metric = "Kappa",
+                    trControl = ctrl2)
+saveRDS(under.model.glmn.kappa, "under.model.glmn.kappa.rds")
+set.seed(1)
+model.glmn.kappa <- train(x_train,
+                    y_train,
+                    method = "glmnet",
+                    tuneGrid = glmnGrid,
+                    metric = "Kappa",
+                    trControl = ctrl3)
+saveRDS(model.glmn.kappa, "model.glmn.kappa.rds")
+model.glmn.kappa = readRDS("model.glmn.kappa.rds")
+set.seed(1)
+model.vis.glmn = train(disease~.,
+                    under_xy_train,
+                    method = "glmnet",
+                    tuneGrid = glmnGrid,
+                    metric = "Kappa",
+                    trControl = ctrl3)
+
+```
+
+# LDA
+
+```{r}
+set.seed(1)
+model.lda <- train(x = x_train,
+                   y = y_train,
+                   method = "lda",
+                   metric = "ROC",
+                   trControl = ctrl)
+set.seed(1)
+under.model.lda.kappa <- train(x = under_x_train,
+                   y = under_y_train,
+                   method = "lda",
+                   metric = "Kappa",
+                   trControl = ctrl2)
+
+set.seed(1)
+model.lda.kappa <- train(x = x_train,
+                   y = y_train,
+                   method = "lda",
+                   metric = "Kappa",
+                  trControl = ctrl3)
+```
+
+# QDA
+```{r}
+set.seed(1)
+model.qda <-train(x = x_train,
+                  y = y_train,
+                  method = "qda",
+                  metric = "ROC",
+                  trControl = ctrl)
+set.seed(1)
+under.model.qda.kappa <-train(x = under_x_train,
+                  y = under_y_train,
+                  method = "qda",
+                  metric = "Kappa",
+                  trControl = ctrl2)
+
+set.seed(1)
+model.qda.kappa <-train(x = x_train,
+                  y = y_train,
+                  method = "qda",
+                  metric = "Kappa",
+                  trControl = ctrl3)
+
+```
+
+
+
+# explain your prediction
+
+the input needs to be data frame
+```{r}
+new <- under_xy_test[c(2, 3),-25]
+explainer.glmn <- lime(under_xy_train[,-25], model.vis.glmn)
+explanation.glmn <- lime::explain(new, explainer.glmn, n_features = 24,
+                           labels = "neg")
+plot_features(explanation.glmn)
+
+new <- as.data.frame(under_x_test[c(2,7),-25])
+explainer.vanilla <- lime(as.data.frame(under_x_train), cnnet.fit)
+explanation <- lime::explain(new, explainer.vanilla, n_features = 24,
+                           labels = "neg")
+plot_features(explanation)
+```
+
+
+
+
+# compare based on Kappa after threshold selection
+
+```{r}
+
+
+get_threshold = function(train, tree =0){
+      resample_stats = thresholder(train, 
+                              threshold = seq(.05, 0.99, by = 0.05), 
+                              final = TRUE) 
+      index = which.max(resample_stats$Kappa)
+      threshold = resample_stats[index, 'prob_threshold']
+      if (tree == 1){
+        prob.pred <- predict.train(train, newdata = data_test[,2:18], type = "prob")[,1]}
+      else{
+         prob.pred <- predict.train(train, newdata = x_test, type = "prob")[,1]
+      }
+      
+      class.pred <- rep("neg", length(prob.pred))
+      class.pred[prob.pred>threshold] <- "pos"
+      confusion = confusionMatrix(data = factor(class.pred, level = c("pos", "neg")),
+                                  reference = y_test)
+      
+       tibble(threshold = threshold,
+             cv_kappa = resample_stats[index, 'Kappa'],
+             cv_recall = resample_stats[index, 'Recall'],
+             cv_precison = resample_stats[index, 'Precision'],
+             cv_F1 = resample_stats[index, 'F1'],
+             test_kappa = confusion$overall[2]
+             )
+}
+
+#  If the class probability corresponding to the first level of the outcome is greater than the threshold, the data point is classified as that level. here the first level is pos.
+
+rf = readRDS("rf_threshold_cv.rds")
+boosting = readRDS("gbmB.fit_kappa_threshold.rds")
+
+
+
+map_dfr(list(nb = model.nb.kappa.all, 
+             knn = model.knn.kappa.all, 
+             glm = model.glm.kappa, 
+             glmn = model.glmn.kappa,
+             lda = model.lda.kappa,
+             qda = model.qda.kappa,
+             rf = rf,
+             boosting = boosting,
+             tree = tree_kappa_thresholds,
+             vanilla = cnnet.fit.kappa), get_threshold, .id = "input")
+
+set.seed(1)
+tree_kappa_thresholds <- train(x_train, y_train, 
+                   method = "rpart",
+                   tuneGrid = data.frame(cp = exp(seq(-15,-4, len = 200))),
+                   trControl = ctrl3,
+                   metric = "Kappa")
+
+tree_kappa_thresholds = readRDS("tree_kappa_thresholds.rds")
+```
+
+# model selection based on cv-roc(no svm)
+
+```{r}
+
+res = resamples(list(GLM = model.glm,GLMNET = model.glmn,
+                     LDA = model.lda, QDA = model.qda,
+                     NB = model.nb, KNN = model.knn, 
+                     rpart = model.tree,
+                     boosting = model.gbmb,
+                     RandomForest = rf.fit_roc,
+                     vanilla = cnnet.fit))
+summary(res)
+
+bwplot(res, metric = "ROC")
+
+
+```
+
+
+# model selection based on kappa (with svm) using under sample
+```{r}
+res_under = resamples(list(GLM = under.model.glm,GLMNET = under.model.glmn.kappa,
+                     LDA = under.model.lda.kappa, QDA = under.model.qda.kappa,
+                     NB = under.model.nb.kappa, KNN = under.model.knn.kappa, 
+                     rpart = tree_kappa_undersample,
+                     boosting = gbmB.fit_kappa_undersample,
+                     RandomForest = rf.fit_undersample,
+                     svmR = svmr.fit.under,
+                     svmL = svml.fit.under,
+                     vanilla = under.cnnet.fit.kappa))
+summary(res_under)
+
+bwplot(res_under)
+```
+
+# testing using ROC models
+
+```{r}
+glm.pred <- predict.train(model.glm, newdata = x_test, type = "prob")[,1]
+glmn.pred <- predict.train(model.glmn, newdata = x_test, type = "prob")[,1]
+
+roc.glm <- roc(y_test, glm.pred, levels = c("neg", "pos"))
+roc.glmn <- roc(y_test, glmn.pred, levels = c("neg", "pos"))
+
+
+auc = c(roc.glm$auc[1], roc.glmn$auc[1], roc.lda$auc[1], roc.qda$auc[1], roc.nb$auc[1], roc.knn$auc[1], roc.tree$auc[1], roc.gbmb$auc[1], roc.rf$auc[1], roc.vanilla$auc[1])
+plot(roc.glm, legacy.axes = TRUE)
+plot(roc.glmn, col = 2, add = TRUE)
+plot(roc.lda, col = 3, add = TRUE)
+plot(roc.qda, col = 4, add = TRUE)
+plot(roc.nb, col = 5, add = TRUE)
+plot(roc.knn, col = 6, add = TRUE)
+plot(roc.tree, col = 7, add = TRUE)
+plot(roc.gbmb, col = 8, add = TRUE)
+plot(roc.rf, col = 9, add = TRUE)
+plot(roc.vanilla, col = 10, add = TRUE)
+modelNames <- c("glm","glmn","lda","qda","nb", "knn", "rpart", "boosting", "randomforest", "vanilla")
+
+legend("bottomright", legend = paste0(modelNames, ": ", round(auc,3)),
+       col = 1:10, lwd = 2)
+
+get_roc_test = function(train){
+  pred <- predict.train(train, newdata = x_test, type = "prob")[,1]
+  
+  roc <- roc(y_test, pred, levels = c("neg", "pos"))
+  
+  return(roc)
+}
+
+roc.rf <- roc(y_test, rf.pred, levels = c("neg", "pos"))
+roc.glm = get_roc_test(model.glm)
+roc.glmn = get_roc_test(model.glmn)
+roc.lda = get_roc_test(model.lda)
+roc.qda = get_roc_test(model.qda)
+roc.nb = get_roc_test(model.nb)
+roc.knn = get_roc_test(model.knn)
+roc.tree = get_roc_test(model.tree)
+roc.gbmb = get_roc_test(model.gbmb)
+roc.rf = get_roc_test(rf.fit_roc)
+roc.vanilla = get_roc_test(cnnet.fit)
+
+```
+
+# testing kappa using sub-data
+
+```{r}
+get_test_kappa_under = function(train){
+   prob.pred <- predict.train(train, newdata = under_x_test, type = "prob")[,1]
+   class.pred <- rep("neg", length(prob.pred))
+   class.pred[prob.pred>0.5] <- "pos"
+      confusion = confusionMatrix(data = factor(class.pred, level = c("pos", "neg")),
+                                  reference = under_y_test)
+      tibble(test_kappa = confusion$overall[2])
+  
+  
+}
+
+map_dfr(list(glm = under.model.glm,
+             glmn = under.model.glmn.kappa,
+             nb = under.model.nb.kappa, 
+             knn = under.model.knn.kappa, 
+             lda = under.model.lda.kappa,
+             qda = under.model.qda.kappa,
+             #rf = rf.fit_undersample,
+             boosting = gbmB.fit_kappa_undersample,
+             tree = tree_kappa_undersample,
+             vanilla = under.cnnet.fit.kappa), get_test_kappa_under, .id = "input")
+     
+````
